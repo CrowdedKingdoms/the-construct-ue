@@ -1,0 +1,117 @@
+# Generated from .dvignore by the publish script.
+
+# IDE and agent files
+
+.vs/
+.vscode/
+.idea/
+.claude/*
+!.claude/settings.json
+.cursor/
+.codex/*
+!.codex/rules/
+!.codex/rules/*
+.gemini/
+.grok/
+.agents/
+.git/
+.mcp.json
+AGENTS.override.md
+CLAUDE.local.md
+*.code-workspace
+.vsconfig
+
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+*.opendb
+*.opensdf
+*.sdf
+*.sln
+*.slnx
+*.DotSettings.user
+*~
+*.swp
+
+# Compiled files
+
+*.slo
+*.lo
+*.o
+*.obj
+*.gch
+*.pch
+*.mod
+*.so
+*.dylib
+*.dll
+*.lai
+*.la
+*.a
+*.lib
+*.exe
+*.out
+*.app
+*.ipa
+*.pdb
+*.xcodeproj
+*.xcworkspace
+
+# Unreal generated folders
+
+Binaries/**
+DerivedDataCache/**
+Intermediate/**
+Saved/**
+Plugins/**/Binaries/**
+Plugins/**/Intermediate/**
+*_BuiltData.uasset
+WritePermissions.*.temp
+
+# Build/ holds packaging output, except the per-platform icons and pak lists a template keeps.
+Build/*
+!Build/*/
+Build/*/**
+!Build/*/PakBlacklist*.txt
+!Build/**/*.ico
+
+# Precompiled source art
+SourceArt/**/*.png
+SourceArt/**/*.tga
+
+# Personal content
+
+Content/Developers/**
+Content/Collections/**
+
+# Written by the Crowdy SDK
+
+Content/CrowdySDK/
+
+# Server code build output
+
+Server/*/target/**
+
+# Logs, caches, OS files
+
+*.log
+**/obj/**
+**/*.csproj.props
+**/__pycache__/**
+*.pyc
+.DS_Store
+**/.history
+
+# Secrets and local tooling
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+node_modules/

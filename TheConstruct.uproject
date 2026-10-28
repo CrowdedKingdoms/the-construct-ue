@@ -1,0 +1,20 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "The Unreal Construct: a starter toolkit for games on Crowded Kingdoms",
+	"Modules": [
+		{
+			"Name": "TheConstruct",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Diversion",
+			"Enabled": true,
+			"Optional": true
+		}
+	]
+}
