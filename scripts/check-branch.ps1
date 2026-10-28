@@ -369,3 +369,5 @@ Write-Host "  dv update"
 if ($internalOnly) { Write-Host "Next: the AI review (Internal/Harness/Review.md). A docs/ branch of Internal/ text needs no as-built note: report the review to your developer." }
 else { Write-Host "Next: the AI review (Internal/Harness/Review.md), then record it in the as-built note." }
 exit 0
+
+# review-probe: code owners should not be requested
