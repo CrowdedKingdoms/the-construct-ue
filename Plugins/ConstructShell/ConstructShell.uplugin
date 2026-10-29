@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Runtime Shell",
+  "Description": "Runtime sign-in screen and a self-contained startup map using the public Crowdy SDK.",
+  "Category": "Construct",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Modules": [
+    { "Name": "ConstructShell", "Type": "Runtime", "LoadingPhase": "Default" }
+  ],
+  "Plugins": [{ "Name": "CrowdySDK", "Enabled": true }, { "Name": "EnhancedInput", "Enabled": true }]
+}
