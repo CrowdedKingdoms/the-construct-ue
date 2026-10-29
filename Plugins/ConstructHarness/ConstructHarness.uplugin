@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Harness",
+  "Description": "Unattended checks for the Construct's layers, run on a packaged build from the harness maps.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [
+    { "Name": "ConstructHarness", "Type": "Runtime", "LoadingPhase": "Default" }
+  ],
+  "Plugins": [{ "Name": "CrowdySDK", "Enabled": true }]
+}
