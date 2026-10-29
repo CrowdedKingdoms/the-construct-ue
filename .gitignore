@@ -4,6 +4,8 @@ Saved/
 DerivedDataCache/
 Plugins/**/Binaries/
 Plugins/**/Intermediate/
+Server/*/target/
+Server/*/revisions.json
 *_BuiltData.uasset
 Content/Developers/
 Content/Collections/
