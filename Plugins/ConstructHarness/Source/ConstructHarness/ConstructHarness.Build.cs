@@ -19,6 +19,7 @@ public class ConstructHarness : ModuleRules
 		{
 			"CrowdyNet",
 			"CrowdySDK",
+			"CrowdyVoice",
 		});
 	}
 }
