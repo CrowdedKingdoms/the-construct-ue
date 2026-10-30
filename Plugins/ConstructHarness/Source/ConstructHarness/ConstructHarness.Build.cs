@@ -7,8 +7,11 @@ public class ConstructHarness : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new[]
 		{
+			"ConstructPresence",
+			"ConstructShell",
 			"Core",
 			"CoreUObject",
+			"CrowdyReplication",
 			"CrowdyServices",
 			"Engine",
 		});
