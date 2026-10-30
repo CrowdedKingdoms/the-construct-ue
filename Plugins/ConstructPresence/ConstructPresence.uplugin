@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Presence",
+  "Description": "Runtime capsule pawns and name tags using Crowdy presence.",
+  "Category": "Construct",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Modules": [
+    { "Name": "ConstructPresence", "Type": "Runtime", "LoadingPhase": "Default" }
+  ],
+  "Plugins": [
+    { "Name": "ConstructShell", "Enabled": true },
+    { "Name": "CrowdySDK", "Enabled": true },
+    { "Name": "EnhancedInput", "Enabled": true }
+  ]
+}
