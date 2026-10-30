@@ -1,5 +1,6 @@
 #include "ConstructLayer1Check.h"
 
+#include "ConstructHarnessLog.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "HAL/PlatformMisc.h"
@@ -11,8 +12,6 @@
 #include "Subsystem/CrowdyChannels.h"
 #include "Subsystem/CrowdyGameSession.h"
 #include "Subsystem/CrowdySDKSubsystem.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogConstructHarness, Log, All);
 
 namespace
 {
