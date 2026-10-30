@@ -1,0 +1,35 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Construct Chat",
+	"Description": "Runtime nearby chat and an explicitly selected channel fallback.",
+	"Category": "Construct",
+	"EnabledByDefault": true,
+	"CanContainContent": true,
+	"Modules": [
+		{
+			"Name": "ConstructChat",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "CrowdySDK",
+			"Enabled": true
+		},
+		{
+			"Name": "ConstructShell",
+			"Enabled": true
+		},
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "ConstructPresence",
+			"Enabled": true
+		}
+	]
+}
