@@ -31,6 +31,12 @@ class CONSTRUCTPRESENCE_API AConstructPresencePawn : public ACharacter
 
 public:
 	AConstructPresencePawn();
+	/** Current replicated display name; presentation only, never an identity check. */
+	UFUNCTION(BlueprintPure, Category = "Construct|Presence")
+	FString GetPlayerName() const
+	{
+		return PlayerName;
+	}
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void PossessedBy(AController* NewController) override;
