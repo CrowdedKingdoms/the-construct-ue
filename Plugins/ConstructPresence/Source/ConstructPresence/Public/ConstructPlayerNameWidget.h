@@ -93,6 +93,7 @@ private:
 
 	bool ResolveIdentity(int64& UserID, FGuid& NetID, FGuid& OwnerID) const;
 	bool CanInteract() const;
+	bool CanClose() const;
 	bool BeginRequest(bool bSave);
 	bool ConsumeRequest(UConstructPlayerNameRequest* Request);
 	void RequestSucceeded(UConstructPlayerNameRequest* Request, const FCrowdyPlayerProfile& Profile);

@@ -55,6 +55,10 @@ public:
 		{
 			return Owner.IsValid() && Owner->CanInteract() && !Owner->IsBusy();
 		};
+		auto Close = [Owner]()
+		{
+			return Owner.IsValid() && Owner->CanClose();
+		};
 
 		TSharedRef<SVerticalBox> Form = SNew(SVerticalBox);
 		Form->AddSlot()
@@ -195,7 +199,7 @@ public:
 		     SHorizontalBox::Slot().AutoWidth()[SNew(SButton)
 		                                            .ButtonStyle(Secondary)
 		                                            .ContentPadding(FMargin(12, 8))
-		                                            .IsEnabled_Lambda(Interact)
+		                                            .IsEnabled_Lambda(Close)
 		                                            .OnClicked_Lambda(
 		                                                [Owner]()
 		                                                {
@@ -307,6 +311,11 @@ bool UConstructPlayerNameWidget::CanInteract() const
 	return Gate && Gate->CanUseNavigationInput(NameModalKey) && Auth && !Auth->IsLegalAcceptancePending();
 }
 
+bool UConstructPlayerNameWidget::CanClose() const
+{
+	return bOpen;
+}
+
 void UConstructPlayerNameWidget::SetInitialProfile(const FCrowdyPlayerProfile& Profile, bool bReadSucceeded)
 {
 	int64 UserID = 0;
@@ -375,7 +384,7 @@ void UConstructPlayerNameWidget::OpenEditor()
 
 void UConstructPlayerNameWidget::CloseEditor()
 {
-	if (!CanInteract())
+	if (!bOpen)
 	{
 		return;
 	}

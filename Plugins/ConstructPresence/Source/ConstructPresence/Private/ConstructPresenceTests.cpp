@@ -8,10 +8,15 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
+#include "Subsystem/CrowdyGameSession.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "InputModifiers.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
@@ -98,6 +103,35 @@ struct FConstructPresenceTestAccess
 	static TArray<UStaticMeshComponent*> CapsuleParts(const AConstructPresencePawn& Pawn)
 	{
 		return {Pawn.CapsuleBody.Get(), Pawn.CapsuleTop.Get(), Pawn.CapsuleBottom.Get()};
+	}
+
+	static ECrowdyHostOverride HostOverride(const AConstructPresencePawn& Pawn)
+	{
+		return Pawn.Entity->HostOverride;
+	}
+
+	static void ArmReply(AConstructPresencePawn& Pawn,
+	                     UCrowdyGameSession* Session,
+	                     int64 UserID,
+	                     const FGuid& NetID,
+	                     const FGuid& OwnerID)
+	{
+		Pawn.NameLookupSession = Session;
+		Pawn.NameLookupUser = UserID;
+		Pawn.NameLookupEntity = NetID;
+		Pawn.NameLookupOwner = OwnerID;
+		Pawn.bNameLookupPending = true;
+	}
+
+	static void ConfigureLookMappings(UInputMappingContext* Context,
+	                                  UInputAction* MouseAction,
+	                                  UInputAction* GamepadAction)
+	{
+		AConstructPresencePawn::ConfigureLookMappings(Context, MouseAction, GamepadAction);
+	}
+	static float ControllerPitchDelta(float AxisY, float Scale)
+	{
+		return AConstructPresencePawn::ControllerPitchDelta(AxisY, Scale);
 	}
 };
 
@@ -431,6 +465,8 @@ bool FConstructPresenceRejectedCallbacksTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Late lookup error cannot replace canceled pawn name"),
 	          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
 	          OriginalName);
+	Fixture.Pawn->FindComponentByClass<UCrowdyEntityComponent>()->AssignPooledIdentity(
+	    FGuid::NewGuid(), FGuid::NewGuid(), ECrowdyRole::Owner, 0);
 	FConstructPresenceTestAccess::ArmReplyWithoutSession(*Fixture.Pawn);
 	FConstructPresenceTestAccess::DeliverProfile(*Fixture.Pawn);
 	TestEqual(TEXT("Pending result without a valid local session cannot replace pawn name"),
@@ -455,6 +491,195 @@ bool FConstructPresenceRejectedCallbacksTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPresenceNameTagSanitizationTest,
+                                 "Construct.Presence.Name.DisplayTagSanitization",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPresenceNameTagSanitizationTest::RunTest(const FString& Parameters)
+{
+	ConstructPresenceTests::FBackgroundWorld Fixture;
+	if (!Fixture.Initialize(*this))
+	{
+		return false;
+	}
+	const FString HtmlBreakName(TEXT("Visible first line<br>second line\nthird line"));
+	FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, HtmlBreakName);
+	TestEqual(TEXT("The tag stops at a literal HTML break"),
+	          FConstructPresenceTestAccess::Tag(*Fixture.Pawn)->Text.ToString(),
+	          FString(TEXT("Visible first line")));
+	TestEqual(TEXT("The HTML-break profile value remains unchanged"),
+	          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
+	          HtmlBreakName);
+
+	const FString CarriageReturnName(TEXT("Visible before CR\rhidden after CR"));
+	FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, CarriageReturnName);
+	TestEqual(TEXT("The tag stops at a carriage return"),
+	          FConstructPresenceTestAccess::Tag(*Fixture.Pawn)->Text.ToString(),
+	          FString(TEXT("Visible before CR")));
+
+	const FString NewlineName(TEXT("Visible before LF\nhidden after LF"));
+	FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, NewlineName);
+	TestEqual(TEXT("The tag stops at a line feed"),
+	          FConstructPresenceTestAccess::Tag(*Fixture.Pawn)->Text.ToString(),
+	          FString(TEXT("Visible before LF")));
+
+	const FString LongName = FString::ChrN(200, TEXT('N'));
+	FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, LongName);
+	TestEqual(
+	    TEXT("Long replicated profile remains unchanged"), FConstructPresenceTestAccess::Name(*Fixture.Pawn), LongName);
+	TestEqual(TEXT("The tag is capped at 64 characters"),
+	          FConstructPresenceTestAccess::Tag(*Fixture.Pawn)->Text.ToString(),
+	          FString::ChrN(64, TEXT('N')));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPresenceIdentityGuardTest,
+                                 "Construct.Presence.Name.RejectsEachMismatchedIdentity",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPresenceIdentityGuardTest::RunTest(const FString& Parameters)
+{
+	ConstructPresenceTests::FBackgroundWorld Fixture;
+	if (!Fixture.Initialize(*this))
+	{
+		return false;
+	}
+	struct FSessionFixture
+	{
+		UWorld* World = nullptr;
+		TStrongObjectPtr<UGameInstance> Instance;
+		TStrongObjectPtr<UCrowdyGameSession> Session;
+		~FSessionFixture()
+		{
+			if (World)
+			{
+				World->SetGameInstance(nullptr);
+			}
+		}
+	} SessionFixture;
+	SessionFixture.World = Fixture.World;
+	SessionFixture.Instance.Reset(NewObject<UGameInstance>(GEngine));
+	// Exercise the real session type without initializing unrelated SDK services.
+	SessionFixture.Session.Reset(NewObject<UCrowdyGameSession>(SessionFixture.Instance.Get()));
+	Fixture.World->SetGameInstance(SessionFixture.Instance.Get());
+	UCrowdyGameSession* Session = SessionFixture.Session.Get();
+	UCrowdyEntityComponent* Entity = Fixture.Pawn->FindComponentByClass<UCrowdyEntityComponent>();
+	if (!TestNotNull(TEXT("Callback fixture owns a real SDK session object"), Session) ||
+	    !TestNotNull(TEXT("Callback fixture has the production entity component"), Entity))
+	{
+		return false;
+	}
+	const FGuid ExpectedNet = FGuid::NewGuid();
+	const FGuid ExpectedOwner = FGuid::NewGuid();
+	struct FIdentityCase
+	{
+		const TCHAR* Label;
+		int64 User;
+		FGuid Net;
+		FGuid Owner;
+		bool bAccept;
+	};
+	const FIdentityCase Cases[] = {
+	    {TEXT("matching identity"), 42, ExpectedNet, ExpectedOwner, true},
+	    {TEXT("different user"), 43, ExpectedNet, ExpectedOwner, false},
+	    {TEXT("different entity"), 42, FGuid::NewGuid(), ExpectedOwner, false},
+	    {TEXT("different owner"), 42, ExpectedNet, FGuid::NewGuid(), false},
+	};
+	for (const FIdentityCase& Case : Cases)
+	{
+		for (const bool bFailure : {false, true})
+		{
+			// These are isolated in-memory identities, with no token or sign-in.
+			Session->SetUserID(Case.User);
+			Entity->AssignPooledIdentity(Case.Net, Case.Owner, ECrowdyRole::Owner, 0);
+			TestTrue(TEXT("Every case passes the local-owner prerequisite"), Entity->IsLocallyOwned());
+			FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, TEXT("CurrentSyntheticName"));
+			FConstructPresenceTestAccess::ArmReply(*Fixture.Pawn, Session, 42, ExpectedNet, ExpectedOwner);
+			if (bFailure)
+			{
+				FConstructPresenceTestAccess::DeliverFailure(*Fixture.Pawn);
+			}
+			else
+			{
+				FConstructPresenceTestAccess::DeliverProfile(*Fixture.Pawn);
+			}
+			const FString Expected = Case.bAccept ? (bFailure ? TEXT("Player") : TEXT("LateSyntheticProfile"))
+			                                      : TEXT("CurrentSyntheticName");
+			TestEqual(*FString::Printf(TEXT("%s: production %s callback applies only an accepted reply"),
+			                           Case.Label,
+			                           bFailure ? TEXT("failure") : TEXT("success")),
+			          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
+			          Expected);
+			TestFalse(TEXT("Every callback consumes its pending request"),
+			          FConstructPresenceTestAccess::HasPendingReply(*Fixture.Pawn));
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPresenceLookSignTest,
+                                 "Construct.Presence.Input.MouseAndGamepadPitchDirection",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPresenceLookSignTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UInputMappingContext> Context(NewObject<UInputMappingContext>(GetTransientPackage()));
+	UInputAction* MouseAction = NewObject<UInputAction>(Context.Get());
+	MouseAction->ValueType = EInputActionValueType::Axis2D;
+	UInputAction* GamepadAction = NewObject<UInputAction>(Context.Get());
+	GamepadAction->ValueType = EInputActionValueType::Axis2D;
+	FConstructPresenceTestAccess::ConfigureLookMappings(Context.Get(), MouseAction, GamepadAction);
+
+	const FEnhancedActionKeyMapping* MouseMapping = Context->GetMappings().FindByPredicate(
+	    [MouseAction](const FEnhancedActionKeyMapping& Mapping)
+	    {
+		    return Mapping.Action == MouseAction && Mapping.Key == EKeys::Mouse2D;
+	    });
+	const FEnhancedActionKeyMapping* GamepadMapping = Context->GetMappings().FindByPredicate(
+	    [GamepadAction](const FEnhancedActionKeyMapping& Mapping)
+	    {
+		    return Mapping.Action == GamepadAction && Mapping.Key == EKeys::Gamepad_RightY;
+	    });
+	if (!TestNotNull(TEXT("Mouse look mapping exists"), MouseMapping) ||
+	    !TestNotNull(TEXT("Gamepad vertical look mapping exists"), GamepadMapping))
+	{
+		return false;
+	}
+
+	auto ApplyModifiers = [](const FEnhancedActionKeyMapping& Mapping, FInputActionValue Value)
+	{
+		for (const TObjectPtr<UInputModifier>& Modifier : Mapping.Modifiers)
+		{
+			if (Modifier)
+			{
+				Value = Modifier->ModifyRaw(nullptr, Value, 1.0f / 60.0f);
+			}
+		}
+		return Value.Get<FVector2D>();
+	};
+	const float MouseUpY = ApplyModifiers(*MouseMapping, FInputActionValue(FVector(0.0f, 1.0f, 0.0f))).Y;
+	const float MouseDownY = ApplyModifiers(*MouseMapping, FInputActionValue(FVector(0.0f, -1.0f, 0.0f))).Y;
+	const float GamepadUpY = ApplyModifiers(*GamepadMapping, FInputActionValue(FVector(1.0f, 0.0f, 0.0f))).Y;
+	const float GamepadDownY = ApplyModifiers(*GamepadMapping, FInputActionValue(FVector(-1.0f, 0.0f, 0.0f))).Y;
+	TestTrue(TEXT("Mouse up looks up after its Enhanced Input mapping"),
+	         FConstructPresenceTestAccess::ControllerPitchDelta(MouseUpY, 1.0f) > 0.0f);
+	TestTrue(TEXT("Gamepad up looks up after its Enhanced Input mapping"),
+	         FConstructPresenceTestAccess::ControllerPitchDelta(GamepadUpY, 1.0f) > 0.0f);
+	TestTrue(TEXT("Mouse down looks down after its Enhanced Input mapping"),
+	         FConstructPresenceTestAccess::ControllerPitchDelta(MouseDownY, 1.0f) < 0.0f);
+	TestTrue(TEXT("Gamepad down looks down after its Enhanced Input mapping"),
+	         FConstructPresenceTestAccess::ControllerPitchDelta(GamepadDownY, 1.0f) < 0.0f);
+	TestEqual(TEXT("Mapped mouse and gamepad up have the same pitch direction"),
+	          FMath::Sign(FConstructPresenceTestAccess::ControllerPitchDelta(MouseUpY, 1.0f)),
+	          FMath::Sign(FConstructPresenceTestAccess::ControllerPitchDelta(GamepadUpY, 1.0f)));
+	TestTrue(TEXT("Gamepad pitch respects the frame-rate scale"),
+	         FMath::IsNearlyEqual(FConstructPresenceTestAccess::ControllerPitchDelta(GamepadUpY, 0.25f), 0.25f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPresenceCapsuleDefaultsTest,
                                  "Construct.Presence.Pawn.CapsuleDefaults",
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
@@ -467,6 +692,8 @@ bool FConstructPresenceCapsuleDefaultsTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	TestTrue(TEXT("Presence entity host override is owner-only"),
+	         FConstructPresenceTestAccess::HostOverride(*Defaults) == ECrowdyHostOverride::OwnerOnly);
 	const TArray<UStaticMeshComponent*> Parts = FConstructPresenceTestAccess::CapsuleParts(*Defaults);
 	const TArray<FString> ExpectedMeshes = {TEXT("/Engine/BasicShapes/Cylinder.Cylinder"),
 	                                        TEXT("/Engine/BasicShapes/Sphere.Sphere"),

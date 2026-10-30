@@ -8,6 +8,7 @@
 
 class APlayerCameraManager;
 class UConstructPlayerNameWidget;
+class UCrowdyGameSession;
 struct FConstructPlayerNameTestAccess;
 class UCameraComponent;
 class UConstructUIInputSubsystem;
@@ -19,6 +20,8 @@ class UStaticMeshComponent;
 class UTextRenderComponent;
 class UConstructPresenceSubsystem;
 struct FConstructPresenceTestAccess;
+struct FConstructInputTestAccess;
+struct FConstructPresenceSubsystemTestAccess;
 
 /** One locally controlled capsule, or the SDK's pooled presentation of a remote player. */
 UCLASS(Blueprintable)
@@ -53,6 +56,8 @@ private:
 	friend class UConstructPlayerNameWidget;
 	friend struct FConstructPlayerNameTestAccess;
 	friend struct FConstructPresenceTestAccess;
+	friend struct FConstructInputTestAccess;
+	friend struct FConstructPresenceSubsystemTestAccess;
 
 	UFUNCTION()
 	void HandleOwnershipAssigned(const FGuid& NewOwnerID, ECrowdyRole NewRole, bool bIsLocallyOwned);
@@ -66,6 +71,9 @@ private:
 	bool ApplyConfirmedPlayerProfile(const FCrowdyPlayerProfile& Profile);
 	void CommitPlayerProfile(const FCrowdyPlayerProfile& Profile);
 	void AddInputMappings();
+	static void ConfigureLookMappings(UInputMappingContext* Context,
+	                                  UInputAction* MouseAction,
+	                                  UInputAction* GamepadAction);
 	void RemoveInputMappings();
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
@@ -80,6 +88,8 @@ private:
 	void ApplyLocalMovementState(bool bEnabled);
 
 	bool ConsumeNameReply();
+	static float ControllerPitchDelta(float AxisY, float Scale);
+
 	void ApplyProfileName(const FCrowdyPlayerProfile& Profile);
 	void ApplyNameLookupFailure();
 	void SetDisplayedPlayerName(const FString& Name);
@@ -121,6 +131,7 @@ private:
 	bool bLocalProfileReadComplete = false;
 	bool bLocalProfileReadSucceeded = false;
 	TWeakObjectPtr<APlayerCameraManager> NameCamera;
+	TWeakObjectPtr<UCrowdyGameSession> NameLookupSession;
 	FGuid NameLookupEntity;
 	FGuid NameLookupOwner;
 	int64 NameLookupUser = 0;

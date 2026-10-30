@@ -128,9 +128,18 @@ struct FConstructPlayerNameTestAccess
 
 	static void SeedOpenForm(UConstructPlayerNameWidget& Widget)
 	{
-		// OpenEditor needs a real signed-in identity; prepare only its Construct-owned shutdown state.
 		Widget.bOpen = true;
 		Widget.bInitialPromptPending = true;
+	}
+
+	static bool CanClose(const UConstructPlayerNameWidget& Widget)
+	{
+		return Widget.CanClose();
+	}
+
+	static bool CanInteract(const UConstructPlayerNameWidget& Widget)
+	{
+		return Widget.CanInteract();
 	}
 };
 
@@ -492,8 +501,36 @@ bool FConstructPlayerNameShutdownTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-// CloseEditor intentionally has no no-session test here: CanInteract would reject it,
-// masking the behavior under test. Real-session UI checks must prove that closing
-// preserves an already submitted save, and accepted completion updates the same pawn
-// without reopening the editor. Only Shutdown/logout/EndPlay detach the receiver.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPlayerNameCloseWithoutSessionTest,
+                                 "Construct.Presence.PlayerName.CloseWithoutReadySession",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPlayerNameCloseWithoutSessionTest::RunTest(const FString& Parameters)
+{
+	ConstructPlayerNameTests::FFixture Fixture;
+	if (!Fixture.Initialize(*this, true))
+	{
+		return false;
+	}
+	UConstructUIInputSubsystem* Gate = Fixture.LocalPlayer->GetSubsystem<UConstructUIInputSubsystem>();
+	if (!TestNotNull(TEXT("Close test has the real LocalPlayer input gate"), Gate))
+	{
+		return false;
+	}
+	const FName NameModal(TEXT("ConstructPlayerName"));
+	Gate->SetSessionReady(false);
+	Gate->SetModal(NameModal, true);
+	FConstructPlayerNameTestAccess::SeedOpenForm(*Fixture.Widget);
+	TestFalse(TEXT("Form is not editable while the session is unready"),
+	          FConstructPlayerNameTestAccess::CanInteract(*Fixture.Widget));
+	TestTrue(TEXT("Close remains enabled for an open form"), FConstructPlayerNameTestAccess::CanClose(*Fixture.Widget));
+	Fixture.Widget->CloseEditor();
+	TestFalse(TEXT("Close dismisses the form without a ready session"), Fixture.Widget->IsOpen());
+	TestFalse(TEXT("Closed form no longer qualifies for its close control"),
+	          FConstructPlayerNameTestAccess::CanClose(*Fixture.Widget));
+	Gate->SetSessionReady(true);
+	TestTrue(TEXT("Closing releases the name modal and restores gameplay input"), Gate->IsGameplayInputAllowed());
+	return true;
+}
 #endif
