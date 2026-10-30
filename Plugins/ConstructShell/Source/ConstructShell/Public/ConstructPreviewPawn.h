@@ -8,6 +8,7 @@ class UInputAction;
 class UInputMappingContext;
 class UEnhancedInputLocalPlayerSubsystem;
 struct FInputActionValue;
+struct FConstructInputTestAccess;
 
 /** Local free camera using Enhanced Input; no Engine default movement bindings or SDK identity. */
 UCLASS(Blueprintable)
@@ -24,6 +25,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend struct FConstructInputTestAccess;
+
 	void AddInputMappings();
 	void RemoveInputMappings();
 	void Move(const FInputActionValue& Value);

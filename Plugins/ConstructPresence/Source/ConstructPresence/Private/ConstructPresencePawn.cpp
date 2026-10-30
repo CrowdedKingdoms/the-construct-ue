@@ -60,6 +60,7 @@ AConstructPresencePawn::AConstructPresencePawn()
 	Entity->Mode = ECrowdyEntityMode::Dynamic;
 	Entity->IdentityPolicy = ECrowdyIdentityPolicy::PlayerDerived;
 	Entity->Ownership = ECrowdyOwnership::LocalClient;
+	Entity->HostOverride = ECrowdyHostOverride::OwnerOnly;
 	Entity->bAutoRegister = true;
 
 	CapsuleBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CapsuleBody"));
@@ -134,6 +135,7 @@ void AConstructPresencePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	RemoveInputMappings();
 	ApplyLocalMovementState(false);
 	bNameLookupPending = false;
+	NameLookupSession.Reset();
 	Entity->OnCrowdyOwnershipAssigned.RemoveDynamic(this, &ThisClass::HandleOwnershipAssigned);
 	NameCamera.Reset();
 	Super::EndPlay(EndPlayReason);
@@ -145,6 +147,7 @@ void AConstructPresencePawn::UnPossessed()
 	RemoveInputMappings();
 	ApplyLocalMovementState(false);
 	bNameLookupPending = false;
+	NameLookupSession.Reset();
 	Super::UnPossessed();
 }
 
@@ -225,9 +228,7 @@ void AConstructPresencePawn::AddInputMappings()
 	MoveAction->AccumulationBehavior = EInputActionAccumulationBehavior::Cumulative;
 	LookAction = NewObject<UInputAction>(this, TEXT("IA_ConstructPresenceLook"));
 	LookAction->ValueType = EInputActionValueType::Axis2D;
-	UInputModifierScalar* MouseSensitivity = NewObject<UInputModifierScalar>(MappingContext);
-	MouseSensitivity->Scalar = FVector(2.5f, -2.5f, 1.0f);
-	LookAction->Modifiers.Add(MouseSensitivity);
+
 	LookRateAction = NewObject<UInputAction>(this, TEXT("IA_ConstructPresenceLookRate"));
 	LookRateAction->ValueType = EInputActionValueType::Axis2D;
 	LookRateAction->AccumulationBehavior = EInputActionAccumulationBehavior::Cumulative;
@@ -238,6 +239,10 @@ void AConstructPresencePawn::AddInputMappings()
 	auto MapMove = [this](FKey Key, bool bForward, bool bNegate)
 	{
 		FEnhancedActionKeyMapping& Mapping = MappingContext->MapKey(MoveAction, Key);
+		if (Key.IsGamepadKey())
+		{
+			Mapping.Modifiers.Add(NewObject<UInputModifierDeadZone>(MappingContext));
+		}
 		if (bNegate)
 		{
 			Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(MappingContext));
@@ -259,12 +264,7 @@ void AConstructPresencePawn::AddInputMappings()
 	MapMove(EKeys::Right, false, false);
 	MapMove(EKeys::Gamepad_LeftX, false, false);
 	MapMove(EKeys::Gamepad_LeftY, true, false);
-	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
-	MappingContext->MapKey(LookRateAction, EKeys::Gamepad_RightX);
-	FEnhancedActionKeyMapping& VerticalLook = MappingContext->MapKey(LookRateAction, EKeys::Gamepad_RightY);
-	UInputModifierSwizzleAxis* LookSwizzle = NewObject<UInputModifierSwizzleAxis>(MappingContext);
-	LookSwizzle->Order = EInputAxisSwizzle::YXZ;
-	VerticalLook.Modifiers.Add(LookSwizzle);
+	ConfigureLookMappings(MappingContext, LookAction, LookRateAction);
 	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
 	MappingContext->MapKey(JumpAction, EKeys::Gamepad_FaceButton_Bottom);
 	MappingContext->MapKey(PlayerNameAction, EKeys::F2);
@@ -274,6 +274,32 @@ void AConstructPresencePawn::AddInputMappings()
 	Input->AddMappingContext(MappingContext, 0, Options);
 }
 
+void AConstructPresencePawn::ConfigureLookMappings(UInputMappingContext* Context,
+                                                   UInputAction* MouseAction,
+                                                   UInputAction* GamepadAction)
+{
+	if (!Context || !MouseAction || !GamepadAction)
+	{
+		return;
+	}
+
+	FEnhancedActionKeyMapping& MouseLook = Context->MapKey(MouseAction, EKeys::Mouse2D);
+	UInputModifierScalar* MouseSensitivity = NewObject<UInputModifierScalar>(Context);
+	MouseSensitivity->Scalar = FVector(2.5f, -2.5f, 1.0f);
+	MouseLook.Modifiers.Add(MouseSensitivity);
+
+	FEnhancedActionKeyMapping& HorizontalLook = Context->MapKey(GamepadAction, EKeys::Gamepad_RightX);
+	HorizontalLook.Modifiers.Add(NewObject<UInputModifierDeadZone>(Context));
+	FEnhancedActionKeyMapping& VerticalLook = Context->MapKey(GamepadAction, EKeys::Gamepad_RightY);
+	VerticalLook.Modifiers.Add(NewObject<UInputModifierDeadZone>(Context));
+	UInputModifierSwizzleAxis* LookSwizzle = NewObject<UInputModifierSwizzleAxis>(Context);
+	LookSwizzle->Order = EInputAxisSwizzle::YXZ;
+	VerticalLook.Modifiers.Add(LookSwizzle);
+	UInputModifierNegate* LookPitchDirection = NewObject<UInputModifierNegate>(Context);
+	LookPitchDirection->bX = false;
+	LookPitchDirection->bY = true;
+	VerticalLook.Modifiers.Add(LookPitchDirection);
+}
 void AConstructPresencePawn::RemoveInputMappings()
 {
 	if (UConstructUIInputSubsystem* Gate = InputGate.Get())
@@ -340,7 +366,7 @@ void AConstructPresencePawn::Look(const FInputActionValue& Value)
 	}
 	const FVector2D Axis = Value.Get<FVector2D>();
 	AddControllerYawInput(Axis.X);
-	AddControllerPitchInput(-Axis.Y);
+	AddControllerPitchInput(ControllerPitchDelta(Axis.Y, 1.0f));
 }
 
 void AConstructPresencePawn::LookRate(const FInputActionValue& Value)
@@ -352,7 +378,7 @@ void AConstructPresencePawn::LookRate(const FInputActionValue& Value)
 	const FVector2D Axis = Value.Get<FVector2D>();
 	const float Scale = 112.5f * GetWorld()->GetDeltaSeconds() * CustomTimeDilation;
 	AddControllerYawInput(Axis.X * Scale);
-	AddControllerPitchInput(-Axis.Y * Scale);
+	AddControllerPitchInput(ControllerPitchDelta(Axis.Y, Scale));
 }
 
 void AConstructPresencePawn::JumpStarted(const FInputActionValue& Value)
@@ -401,6 +427,7 @@ void AConstructPresencePawn::HandleOwnershipAssigned(const FGuid& NewOwnerID, EC
 	{
 		ShutdownPlayerNameWidget();
 		bNameLookupPending = false;
+		NameLookupSession.Reset();
 		return;
 	}
 	EnsurePlayerNameWidget();
@@ -419,6 +446,7 @@ void AConstructPresencePawn::HandleOwnershipAssigned(const FGuid& NewOwnerID, EC
 		ApplyNameLookupFailure();
 		return;
 	}
+	NameLookupSession = Session;
 	NameLookupEntity = Entity->GetNetID();
 	NameLookupOwner = NewOwnerID;
 	NameLookupUser = Session->GetUserID();
@@ -430,14 +458,20 @@ void AConstructPresencePawn::HandleOwnershipAssigned(const FGuid& NewOwnerID, EC
 	Players->GetPlayerName(NameLookupUser, Result, Error);
 }
 
+float AConstructPresencePawn::ControllerPitchDelta(float AxisY, float Scale)
+{
+	return -AxisY * Scale;
+}
+
 bool AConstructPresencePawn::ConsumeNameReply()
 {
-	UGameInstance* Instance = GetGameInstance();
-	UCrowdyGameSession* Session = Instance ? Instance->GetSubsystem<UCrowdyGameSession>() : nullptr;
-	const bool bAccept = bNameLookupPending && !IsActorBeingDestroyed() && Entity->IsLocallyOwned() &&
-	                     Entity->GetNetID() == NameLookupEntity && Entity->GetOwnerID() == NameLookupOwner && Session &&
-	                     Session->GetUserID() == NameLookupUser;
+	const UCrowdyGameSession* Session = NameLookupSession.Get();
+	const bool bAccept = bNameLookupPending && !IsActorBeingDestroyed() && Entity && Entity->IsLocallyOwned() &&
+	                     Session && Session->GetGameInstance() == GetGameInstance() &&
+	                     Session->GetUserID() == NameLookupUser && Entity->GetNetID() == NameLookupEntity &&
+	                     Entity->GetOwnerID() == NameLookupOwner;
 	bNameLookupPending = false;
+	NameLookupSession.Reset();
 	return bAccept;
 }
 
@@ -541,6 +575,7 @@ void AConstructPresencePawn::CommitPlayerProfile(const FCrowdyPlayerProfile& Pro
 {
 	// A confirmed refresh/save supersedes an older initial lookup still in flight.
 	bNameLookupPending = false;
+	NameLookupSession.Reset();
 	ApplyProfileName(Profile);
 }
 
@@ -552,7 +587,17 @@ void AConstructPresencePawn::SetDisplayedPlayerName(const FString& Name)
 
 void AConstructPresencePawn::OnRep_PlayerName()
 {
-	NameTag->SetText(FText::FromString(PlayerName));
+	int32 DisplayLength = PlayerName.Len();
+	for (const TCHAR* BreakMarker : {TEXT("\n"), TEXT("\r"), TEXT("<br>")})
+	{
+		const int32 BreakAt = PlayerName.Find(BreakMarker, ESearchCase::IgnoreCase);
+		if (BreakAt != INDEX_NONE)
+		{
+			DisplayLength = FMath::Min(DisplayLength, BreakAt);
+		}
+	}
+	const FString DisplayName = PlayerName.Left(FMath::Min(DisplayLength, 64));
+	NameTag->SetText(FText::FromString(DisplayName));
 }
 
 void AConstructPresencePawn::ResetRemoteName()

@@ -9,7 +9,7 @@ The screen uses the approved centred near-black/gold design, with existing Crowd
 - Password Sign In and Create Account use the email/password fields. Registration also signs the new account in.
 - Email me a sign-in link uses the email field and waits for the SDK's callback. Social sign-in opens the system browser through the SDK.
 - Saved-session restore happens when the map starts. A first launch without a saved session shows the ordinary form.
-- The form disables repeated submissions while waiting. Cancel sign-in calls the SDK's full Logout operation, which cancels the pending flow and clears its session.
+- The form disables repeated submissions while waiting. Cancel sign-in calls the SDK's CancelSignIn operation. Explicit Sign Out uses Logout.
 - SDK errors and access-ended messages appear inside the card. Password text is cleared after submission and on teardown; this plugin never persists or logs credentials or tokens.
 - The SDK supplies its own legal/age prompt. The shell neither accepts it nor duplicates it.
 - Successful sign-in hides the form and leaves connection/paused status plus Sign Out. SDK connection, token refresh and reconnection remain SDK-owned.
@@ -31,7 +31,7 @@ The screenshot-preview commandlet and its editor module have been removed. The p
 
 ## Runtime controls
 
-The login-only map uses AConstructPreviewPawn: the Engine floating movement/collision behavior with default legacy movement bindings disabled. Its own Enhanced Input context handles movement, mouse look and gamepad controls; it is removed on unpossess/EndPlay. The project input configuration selects EnhancedPlayerInput and EnhancedInputComponent and disables legacy controller scales. Per-action modifiers preserve the existing look gains. Generated device-axis, gesture, touch and unrelated template overrides were removed.
+The login-only map uses AConstructPreviewPawn: the Engine floating movement/collision behavior with default legacy movement bindings disabled. Its own Enhanced Input context handles movement, mouse look and gamepad controls; it is removed on unpossess/EndPlay. The project input configuration selects EnhancedPlayerInput and EnhancedInputComponent and disables legacy controller scales. Enhanced Input modifiers preserve the existing look gains, align mouse and gamepad pitch direction, and apply deadzones to analog stick mappings. Generated device-axis, gesture, touch and unrelated template overrides were removed.
 
 Shared modal state blocks movement/look while sign-in, SDK legal UI or application/access conditions require it. Standard text editing and widget buttons remain Slate/UMG controls. Other gameplay examples are separate from this shell package.
 

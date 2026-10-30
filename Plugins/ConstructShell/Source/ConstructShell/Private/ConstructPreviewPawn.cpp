@@ -48,6 +48,10 @@ void AConstructPreviewPawn::AddInputMappings()
 	auto MapMove = [this](FKey Key, int32 Axis, bool bNegate)
 	{
 		FEnhancedActionKeyMapping& Mapping = MappingContext->MapKey(MoveAction, Key);
+		if (Key.IsGamepadKey() && Key.IsAnalog())
+		{
+			Mapping.Modifiers.Add(NewObject<UInputModifierDeadZone>(MappingContext));
+		}
 		if (bNegate)
 		{
 			Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(MappingContext));
@@ -75,11 +79,17 @@ void AConstructPreviewPawn::AddInputMappings()
 	MapMove(EKeys::Gamepad_RightThumbstick, 2, true);
 	MapMove(EKeys::Gamepad_FaceButton_Bottom, 2, false);
 	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
-	MappingContext->MapKey(LookRateAction, EKeys::Gamepad_RightX);
+	FEnhancedActionKeyMapping& HorizontalLook = MappingContext->MapKey(LookRateAction, EKeys::Gamepad_RightX);
+	HorizontalLook.Modifiers.Add(NewObject<UInputModifierDeadZone>(MappingContext));
 	FEnhancedActionKeyMapping& VerticalLook = MappingContext->MapKey(LookRateAction, EKeys::Gamepad_RightY);
+	VerticalLook.Modifiers.Add(NewObject<UInputModifierDeadZone>(MappingContext));
 	UInputModifierSwizzleAxis* LookSwizzle = NewObject<UInputModifierSwizzleAxis>(MappingContext);
 	LookSwizzle->Order = EInputAxisSwizzle::YXZ;
 	VerticalLook.Modifiers.Add(LookSwizzle);
+	UInputModifierNegate* PitchDirection = NewObject<UInputModifierNegate>(MappingContext);
+	PitchDirection->bX = false;
+	PitchDirection->bY = true;
+	VerticalLook.Modifiers.Add(PitchDirection);
 	MappingContext->MapKey(LookRateAction, EKeys::Right);
 	MappingContext->MapKey(LookRateAction, EKeys::Left).Modifiers.Add(NewObject<UInputModifierNegate>(MappingContext));
 	FModifyContextOptions Options;

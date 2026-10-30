@@ -6,6 +6,7 @@
 #include "ConstructPresenceSubsystem.generated.h"
 
 class UCrowdyEntitySubsystem;
+struct FConstructPresenceSubsystemTestAccess;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogConstructPresence, Log, All);
 
@@ -24,6 +25,12 @@ protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
 private:
+	friend struct FConstructPresenceSubsystemTestAccess;
+
+	void BindLifecycleEvents();
+	void UnbindLifecycleEvents();
+	UFUNCTION()
+	void EntityRegistered(const FGuid& UUID);
 	UFUNCTION()
 	void RemoteAppeared(FGuid UUID, FInstancedStruct InitialState, int32 ActorCount);
 	UFUNCTION()
@@ -34,5 +41,6 @@ private:
 
 	TWeakObjectPtr<UCrowdyActorTracker> Tracker;
 	TWeakObjectPtr<UCrowdyEntitySubsystem> Entities;
+	TSet<FGuid> PendingRemotePlayers;
 	TSet<FGuid> RemotePlayers;
 };

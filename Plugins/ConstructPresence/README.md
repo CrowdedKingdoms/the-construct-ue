@@ -6,7 +6,7 @@ ConstructPresence adds capsule player pawns and overhead names to the existing C
 
 The plugin enables its ConstructShell and CrowdySDK dependencies. Select `/ConstructPresence/Framework/BP_ConstructPresenceGameMode` for a map that uses presence. The startup map already selects it. Configure the application's connection through the SDK's normal Studio workflow.
 
-The GameMode starts the player as a spectator. The shell admits the native presence pawn after sign-in and connection are ready, and releases it on sign-out or access end. The native presence character uses Unreal Character Movement for walking, gravity, falling and one grounded jump. Its own Enhanced Input context maps WASD/arrows and the left stick to ground movement, mouse/right stick to look, and Space/the bottom gamepad face button to jump. Looking up or down does not turn walking into flight. The shell's separate preview camera remains a free camera.
+The GameMode starts the player as a spectator. The shell admits the native presence pawn after sign-in and connection are ready, and releases it on sign-out or access end. The native presence character uses Unreal Character Movement for walking, gravity, falling and one grounded jump. Its own Enhanced Input context maps WASD/arrows and the left stick to ground movement, mouse/right stick to look, and Space/the bottom gamepad face button to jump. Mouse and stick pitch use the same direction; analog stick mappings filter neutral drift through Enhanced Input deadzones. Looking up or down does not turn walking into flight. The shell's separate preview camera remains a free camera.
 
 ## Visuals and names
 
@@ -30,7 +30,7 @@ The form uses the shell's runtime styles and input gate. Opening it blocks movem
 
 ## Pooled copies
 
-The game-world subsystem disables the SDK's owner echo and listens to its appearance, departure and timeout events. On appearance it clears both the reused pawn's name field and its rendered text. This lets the next identical name notify correctly. The SDK owns spawning, interpolation, hiding and pooling; this plugin does not replace those systems.
+The game-world subsystem disables the SDK's owner echo and listens to its appearance, departure and timeout events. On appearance it clears both the reused pawn's name field and its rendered text. When the copy registers later, the subsystem uses the SDK registry record to identify the remote copy before the pool assigns its component identity. This lets the next identical name notify correctly. The SDK owns spawning, interpolation, hiding and pooling; this plugin does not replace those systems.
 
 The native pawn class stays loaded with the runtime module. A project that changes the wire-spawned pawn to a Blueprint subclass must also follow the SDK's documented class-preloading requirements.
 
