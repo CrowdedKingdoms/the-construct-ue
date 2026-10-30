@@ -22,7 +22,7 @@ Only the locally SDK-owned and locally possessed character runs Character Moveme
 
 ## Player name
 
-Press F2 or the gamepad View button to open/close the runtime player-name form. Its upper-right name badge also opens it when pointer input is available. It also opens automatically after a successful profile read if the account has no gamertag. Enter a gamertag and its public identifier, then choose Save. This updates the signed-in Crowdy account through `UCrowdyPlayers::SetPlayerName`; it does not create a local display-name override. A new empty profile starts with an editable `0001` identifier. Existing identifiers are preserved.
+Press F2 or the gamepad View button to open/close the runtime player-name form. Its upper-right name badge also opens it when pointer input is available. It also opens automatically after a successful profile read if the account has no gamertag. Enter a gamertag and its public identifier on the same row, then choose Save. The identifier sits to the right behind a fixed # prefix. The prefix cannot be edited or deleted and is presentation only; the SDK receives the identifier without it. This updates the signed-in Crowdy account through `UCrowdyPlayers::SetPlayerName`; it does not create a local display-name override. A new empty profile starts with an editable `0001` identifier. Existing identifiers are preserved.
 
 The confirmed returned profile updates the current pawn and its CrowdyState name. Refresh reads the account again through `GetPlayerName` and applies the returned name. Errors leave the existing name and draft intact. A failed initial read offers Refresh rather than assuming the profile is empty. The server owns name availability and account validation.
 
