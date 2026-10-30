@@ -63,62 +63,74 @@ public:
 		                      .Text(LOCTEXT("Title", "Player name"))];
 		Form->AddSlot().AutoHeight().Padding(
 		    0, 12, 0, 5)[SNew(STextBlock).TextStyle(Body).Text(LOCTEXT("Gamertag", "Gamertag"))];
-		Form->AddSlot().AutoHeight()[SNew(SEditableTextBox)
-		                                 .Style(Input)
-		                                 .IsEnabled_Lambda(Edit)
-		                                 .Text_Lambda(
-		                                     [Owner]()
-		                                     {
-			                                     return Owner.IsValid() ? FText::FromString(Owner->GetGamertag())
-			                                                            : FText::GetEmpty();
-		                                     })
-		                                 .OnVerifyTextChanged_Lambda(
-		                                     [](const FText& Value, FText& Error)
-		                                     {
-			                                     if (Value.ToString().Len() <= MaxGamertagLength)
-			                                     {
-				                                     return true;
-			                                     }
-			                                     Error = LOCTEXT("GamertagLimit", "Use at most 64 characters.");
-			                                     return false;
-		                                     })
-		                                 .OnTextChanged_Lambda(
-		                                     [Owner](const FText& Value)
-		                                     {
-			                                     if (Owner.IsValid())
-			                                     {
-				                                     Owner->SetDraftGamertag(Value);
-			                                     }
-		                                     })];
-		Form->AddSlot().AutoHeight().Padding(
-		    0, 12, 0, 5)[SNew(STextBlock).TextStyle(Body).Text(LOCTEXT("Identifier", "Identifier"))];
-		Form->AddSlot().AutoHeight()[SNew(SEditableTextBox)
-		                                 .Style(Input)
-		                                 .IsEnabled_Lambda(Edit)
-		                                 .Text_Lambda(
-		                                     [Owner]()
-		                                     {
-			                                     return Owner.IsValid() ? FText::FromString(Owner->GetDisambiguation())
-			                                                            : FText::GetEmpty();
-		                                     })
-		                                 .OnVerifyTextChanged_Lambda(
-		                                     [](const FText& Value, FText& Error)
-		                                     {
-			                                     if (Value.ToString().Len() <= MaxDisambiguationLength)
-			                                     {
-				                                     return true;
-			                                     }
-			                                     Error = LOCTEXT("IdentifierLimit", "Use at most 128 characters.");
-			                                     return false;
-		                                     })
-		                                 .OnTextChanged_Lambda(
-		                                     [Owner](const FText& Value)
-		                                     {
-			                                     if (Owner.IsValid())
-			                                     {
-				                                     Owner->SetDraftDisambiguation(Value);
-			                                     }
-		                                     })];
+		Form->AddSlot().AutoHeight()
+		    [SNew(SHorizontalBox) +
+		     SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SEditableTextBox)
+		                                                .Style(Input)
+		                                                .IsEnabled_Lambda(Edit)
+		                                                .Text_Lambda(
+		                                                    [Owner]()
+		                                                    {
+			                                                    return Owner.IsValid()
+			                                                               ? FText::FromString(Owner->GetGamertag())
+			                                                               : FText::GetEmpty();
+		                                                    })
+		                                                .OnVerifyTextChanged_Lambda(
+		                                                    [](const FText& Value, FText& Error)
+		                                                    {
+			                                                    if (Value.ToString().Len() <= MaxGamertagLength)
+			                                                    {
+				                                                    return true;
+			                                                    }
+			                                                    Error = LOCTEXT("GamertagLimit",
+			                                                                    "Use at most 64 characters.");
+			                                                    return false;
+		                                                    })
+		                                                .OnTextChanged_Lambda(
+		                                                    [Owner](const FText& Value)
+		                                                    {
+			                                                    if (Owner.IsValid())
+			                                                    {
+				                                                    Owner->SetDraftGamertag(Value);
+			                                                    }
+		                                                    })] +
+		     SHorizontalBox::Slot().AutoWidth().Padding(8, 0, 0, 0)[SNew(SBox).WidthOverride(110).ToolTipText(
+		         LOCTEXT("IdentifierTooltip",
+		                 "Identifier"))[SNew(SHorizontalBox) +
+		                                SHorizontalBox::Slot()
+		                                    .AutoWidth()
+		                                    .VAlign(VAlign_Center)
+		                                    .Padding(0, 0, 5, 0)[SNew(STextBlock).TextStyle(Body).Text(INVTEXT("#"))] +
+		                                SHorizontalBox::Slot().FillWidth(
+		                                    1.0f)[SNew(SEditableTextBox)
+		                                              .Style(Input)
+		                                              .IsEnabled_Lambda(Edit)
+		                                              .Text_Lambda(
+		                                                  [Owner]()
+		                                                  {
+			                                                  return Owner.IsValid()
+			                                                             ? FText::FromString(Owner->GetDisambiguation())
+			                                                             : FText::GetEmpty();
+		                                                  })
+		                                              .OnVerifyTextChanged_Lambda(
+		                                                  [](const FText& Value, FText& Error)
+		                                                  {
+			                                                  if (Value.ToString().Len() <= MaxDisambiguationLength)
+			                                                  {
+				                                                  return true;
+			                                                  }
+			                                                  Error = LOCTEXT("IdentifierLimit",
+			                                                                  "Use at most 128 characters.");
+			                                                  return false;
+		                                                  })
+		                                              .OnTextChanged_Lambda(
+		                                                  [Owner](const FText& Value)
+		                                                  {
+			                                                  if (Owner.IsValid())
+			                                                  {
+				                                                  Owner->SetDraftDisambiguation(Value);
+			                                                  }
+		                                                  })]]]];
 		Form->AddSlot().AutoHeight().Padding(
 		    0, 5, 0, 12)[SNew(STextBlock)
 		                     .TextStyle(Muted)
