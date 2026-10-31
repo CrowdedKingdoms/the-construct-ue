@@ -61,8 +61,11 @@ private:
 	};
 
 	bool Tick(float DeltaTime);
-	bool ReadGo(double Now);
+	bool ReadControl(double Now, FString& OutControl);
 	void StartRun(double Now);
+	void TickEar(double Now);
+	void BeginEarPhase(int32 Phase);
+	void EndEarPhase();
 	void TickTalker(double Elapsed, double Now);
 	void TickFeed(double Elapsed, double Now);
 	void TickListener(double Elapsed);
@@ -89,6 +92,8 @@ private:
 	FVector FarSpot = FVector::ZeroVector;
 	EStage Stage = EStage::WaitEntry;
 	bool bTalker = false;
+	// The by-ear run: phases come from the control file and a person listens; only packets are counted here.
+	bool bEar = false;
 	bool bFeeding = false;
 	bool bWindowOpen = false;
 	double StartedAt = 0.0;
@@ -101,9 +106,11 @@ private:
 	int64 FeedSkippedAtStart = 0;
 	int64 FeedSample = 0;
 	int64 WindowReceivedAtStart = 0;
+	int64 EarCountAtStart = 0;
 	int32 NextLine = 1;
 	int32 FeedIndex = 0;
 	int32 FeedFrames = 0;
 	int32 WindowIndex = 0;
 	int32 MoveIndex = 0;
+	int32 EarPhase = -1;
 };
