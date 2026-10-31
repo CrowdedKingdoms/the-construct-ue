@@ -601,7 +601,8 @@ FText UConstructPlayerNameWidget::BadgeCaption() const
 
 TSharedRef<SWidget> UConstructPlayerNameWidget::RebuildWidget()
 {
-	SAssignNew(View, SConstructPlayerName).Owner(this);
+	// The view fills the screen; only its badge and open form take clicks, so panels beneath it stay usable.
+	SAssignNew(View, SConstructPlayerName).Owner(this).Visibility(EVisibility::SelfHitTestInvisible);
 	return View.ToSharedRef();
 }
 

@@ -3,6 +3,7 @@
 #include "ConstructHarnessLog.h"
 #include "Core/Audio/VoiceChat/VoiceChatSubsystem.h"
 #include "Core/UDP/Enums/ECrowdyMessageType.h"
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -30,6 +31,7 @@ namespace
 	constexpr double Layer3ListenerOffset = 400.0;
 	constexpr double Layer3PollSeconds = 0.05;
 	constexpr double Layer3SettleSeconds = 4.0;
+	constexpr int32 Layer3EarMessageKey = 3003;
 	constexpr double Layer3DoneAt = 62.0;
 
 	// Each feed is 10 s of 20 ms frames: 960 samples of 48 kHz mono, a 440 Hz tone at -12 dBFS.
@@ -153,6 +155,7 @@ void UConstructLayer3CheckSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	bTalker = Role == TEXT("talker");
+	bEar = FParse::Param(FCommandLine::Get(), TEXT("Layer3CheckEar"));
 
 	Chat = GameInstance->GetSubsystem<UCrowdyProximityChat>();
 	Replication = GameInstance->GetSubsystem<UCrowdyCppReplicationSubsystem>();
@@ -263,11 +266,22 @@ bool UConstructLayer3CheckSubsystem::Tick(float DeltaTime)
 	}
 	if (Stage == EStage::WaitGo)
 	{
-		if (ReadGo(Now))
+		// The by-ear run starts on its first phase instead of go.
+		FString Control;
+		if (ReadControl(Now, Control) && Control == (bEar ? Layer3PhaseNames[0] : TEXT("go")))
 		{
 			StartRun(Now);
+			if (bEar)
+			{
+				BeginEarPhase(0);
+			}
 		}
 		return Stage != EStage::Failed;
+	}
+	if (bEar)
+	{
+		TickEar(Now);
+		return Stage == EStage::Run;
 	}
 
 	const double Elapsed = Now - GoAt;
@@ -282,15 +296,19 @@ bool UConstructLayer3CheckSubsystem::Tick(float DeltaTime)
 	return Stage == EStage::Run;
 }
 
-bool UConstructLayer3CheckSubsystem::ReadGo(const double Now)
+bool UConstructLayer3CheckSubsystem::ReadControl(const double Now, FString& OutControl)
 {
 	if (Now - LastPollAt < Layer3PollSeconds)
 	{
 		return false;
 	}
 	LastPollAt = Now;
-	FString Control;
-	return FFileHelper::LoadFileToString(Control, *ControlPath) && Control.TrimStartAndEnd() == TEXT("go");
+	if (!FFileHelper::LoadFileToString(OutControl, *ControlPath))
+	{
+		return false;
+	}
+	OutControl.TrimStartAndEndInline();
+	return true;
 }
 
 void UConstructLayer3CheckSubsystem::StartRun(const double Now)
@@ -298,7 +316,8 @@ void UConstructLayer3CheckSubsystem::StartRun(const double Now)
 	GoAt = Now;
 	Stage = EStage::Run;
 	UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer3Check: go"));
-	if (!bTalker)
+	// In the by-ear run the voice component sets the range itself when push-to-talk starts.
+	if (!bTalker || bEar)
 	{
 		return;
 	}
@@ -312,6 +331,58 @@ void UConstructLayer3CheckSubsystem::StartRun(const double Now)
 		return;
 	}
 	UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer3Check: voice distance %d"), Distance);
+}
+
+void UConstructLayer3CheckSubsystem::TickEar(const double Now)
+{
+	FString Control;
+	if (!ReadControl(Now, Control))
+	{
+		return;
+	}
+	const int32 Next = EarPhase + 1;
+	if (Control == TEXT("done"))
+	{
+		EndEarPhase();
+		LogDone();
+		return;
+	}
+	if (Next < Layer3FeedCount && Control == Layer3PhaseNames[Next])
+	{
+		EndEarPhase();
+		BeginEarPhase(Next);
+	}
+}
+
+void UConstructLayer3CheckSubsystem::BeginEarPhase(const int32 Phase)
+{
+	EarPhase = Phase;
+	if (!bTalker && Phase > 0 && !MoveTo(Phase == 1 ? FarSpot : NearSpot, Phase == 1 ? TEXT("far") : TEXT("near")))
+	{
+		return;
+	}
+	const FCrowdyVoiceStats& Stats = Voice->GetStats();
+	EarCountAtStart = bTalker ? Stats.PacketsSent : Stats.PacketsReceived;
+	UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer3Check: ear phase %s"), Layer3PhaseNames[Phase]);
+	if (GEngine)
+	{
+		const FString Message = bTalker
+		    ? FString::Printf(TEXT("Layer 3 ear check: TALKER. Phase %s: click here, hold V and speak."), Layer3PhaseNames[Phase])
+		    : FString::Printf(TEXT("Layer 3 ear check: LISTENER. Phase %s: tick Listen here, then just listen."), Layer3PhaseNames[Phase]);
+		GEngine->AddOnScreenDebugMessage(Layer3EarMessageKey, 3600.0f, FColor::Yellow, Message);
+	}
+}
+
+void UConstructLayer3CheckSubsystem::EndEarPhase()
+{
+	if (EarPhase < 0)
+	{
+		return;
+	}
+	const FCrowdyVoiceStats& Stats = Voice->GetStats();
+	UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer3Check: ear voice %s %lld (%s)"),
+	       bTalker ? TEXT("sent") : TEXT("received"),
+	       (bTalker ? Stats.PacketsSent : Stats.PacketsReceived) - EarCountAtStart, Layer3PhaseNames[EarPhase]);
 }
 
 void UConstructLayer3CheckSubsystem::TickTalker(const double Elapsed, const double Now)

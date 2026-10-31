@@ -370,7 +370,7 @@ void UConstructVoiceComponent::SendRefused(const FCrowdySendRefusal& Refusal)
 {
 	if (bRuntimeActive && Refusal.MessageType == 134)
 	{
-		LastStatus = LOCTEXT("Refused", "Voice is not enabled for this app.");
+		LastStatus = LOCTEXT("Refused", "Voice is not enabled for this app");
 	}
 }
 
@@ -552,7 +552,7 @@ FText UConstructVoiceComponent::GetStatusText() const
 		Device = LOCTEXT("MicStarting", "Starting");
 		break;
 	case ECrowdyVoiceMicState::Capturing:
-		Device = LOCTEXT("MicLive", "Talking (microphone live)");
+		Device = LOCTEXT("MicLive", "Talking");
 		break;
 	case ECrowdyVoiceMicState::NoDevice:
 		Device = LOCTEXT("MicMissing", "No microphone");

@@ -115,16 +115,29 @@ bool FConstructChatRenderedFocusTest::RunTest(const FString& Parameters)
 	}
 	Chat->UseNearbyChat();
 	Chat->OpenComposer();
-	if (!TestTrue(TEXT("The actual composer opens and takes native text-field focus"),
-	              Chat->IsComposerOpen() && Panel->HasUserFocusedDescendants(Controller)))
+	if (!TestTrue(TEXT("The actual composer opens"), Chat->IsComposerOpen()))
 	{
 		Chat->CloseComposer();
 		return false;
 	}
-	Chat->CloseComposer();
 	const TWeakObjectPtr<APlayerController> WeakController(Controller);
 	const TWeakObjectPtr<UConstructChatComponent> WeakChat(Chat);
 	const TWeakObjectPtr<UConstructChatPanel> WeakPanel(Panel);
+	// The input mode applies its widget focus on the next frame, so the text field is checked after one.
+	ADD_LATENT_AUTOMATION_COMMAND(FDelayedFunctionLatentCommand(
+	    [this, WeakController, WeakChat, WeakPanel]()
+	    {
+		    APlayerController* Current = WeakController.Get();
+		    UConstructChatComponent* CurrentChat = WeakChat.Get();
+		    const UConstructChatPanel* CurrentPanel = WeakPanel.Get();
+		    TestTrue(TEXT("The open composer takes native text-field focus"),
+		             Current && CurrentPanel && CurrentPanel->HasUserFocusedDescendants(Current));
+		    if (CurrentChat)
+		    {
+			    CurrentChat->CloseComposer();
+		    }
+	    },
+	    0.2f));
 	ADD_LATENT_AUTOMATION_COMMAND(FDelayedFunctionLatentCommand(
 	    [this, WeakController, WeakChat]()
 	    {
@@ -138,6 +151,15 @@ bool FConstructChatRenderedFocusTest::RunTest(const FString& Parameters)
 		    {
 			    CurrentChat->OpenComposer();
 			    TestTrue(TEXT("Composer can open again after focus restoration"), CurrentChat->IsComposerOpen());
+		    }
+	    },
+	    0.2f));
+	// Submitted a frame after opening, as a player's second Enter is, once the text field holds focus.
+	ADD_LATENT_AUTOMATION_COMMAND(FDelayedFunctionLatentCommand(
+	    [WeakChat]()
+	    {
+		    if (UConstructChatComponent* CurrentChat = WeakChat.Get())
+		    {
 			    // Empty text returns before any SDK send; this exercises the actual submit/close path.
 			    CurrentChat->SubmitComposer(FString());
 		    }
