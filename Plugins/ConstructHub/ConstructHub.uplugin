@@ -3,7 +3,7 @@
 	"Version": 1,
 	"VersionName": "0.1.0",
 	"FriendlyName": "Construct Hub",
-	"Description": "Reflected data types for the Construct world hub.",
+	"Description": "Reflected data types and local HUD status for the Construct world hub.",
 	"Category": "Construct",
 	"EnabledByDefault": true,
 	"CanContainContent": false,
@@ -12,6 +12,16 @@
 			"Name": "ConstructHub",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ConstructShell",
+			"Enabled": true
+		},
+		{
+			"Name": "CrowdySDK",
+			"Enabled": true
 		}
 	]
 }
