@@ -1,0 +1,17 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Construct Hub",
+	"Description": "Reflected data types for the Construct world hub.",
+	"Category": "Construct",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "ConstructHub",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
