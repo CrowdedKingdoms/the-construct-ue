@@ -8,7 +8,19 @@ public class ConstructHub : ModuleRules
         PublicDependencyModuleNames.AddRange(new[]
         {
             "Core",
-            "CoreUObject"
+            "CoreUObject",
+            "Engine",
+            "UMG"
+        });
+        PrivateDependencyModuleNames.AddRange(new[]
+        {
+            "ConstructShell",
+            "CrowdyExec",
+            "CrowdyNet",
+            "CrowdySDK",
+            "Projects",
+            "Slate",
+            "SlateCore"
         });
     }
 }
