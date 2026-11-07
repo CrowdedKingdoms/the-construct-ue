@@ -7,10 +7,12 @@ public class ConstructHarness : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new[]
 		{
+			"ConstructHub",
 			"ConstructPresence",
 			"ConstructShell",
 			"Core",
 			"CoreUObject",
+			"CrowdyExec",
 			"CrowdyReplication",
 			"CrowdyServices",
 			"Engine",
@@ -20,6 +22,7 @@ public class ConstructHarness : ModuleRules
 			"CrowdyNet",
 			"CrowdySDK",
 			"CrowdyVoice",
+			"Json",
 		});
 	}
 }
