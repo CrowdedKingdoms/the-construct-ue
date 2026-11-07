@@ -11,7 +11,6 @@
 #include "StructUtils/PropertyBag.h"
 #include "Subsystem/CrowdyGameSession.h"
 #include "Subsystem/CrowdySDKSubsystem.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -26,15 +25,6 @@ namespace
         const auto Value = State.GetValueInt64(Field);
         return Value.HasValue() ? TOptional<int64>(Value.GetValue()) : TOptional<int64>();
     }
-}
-
-UConstructHubSubsystem::UConstructHubSubsystem()
-{
-    // Hard references keep the generated definitions available in cooked games.
-    static const ConstructorHelpers::FObjectFinder<UCrowdyServerObjectDefinition> WorldAsset(TEXT("/Game/ServerObjects/CSO_ConstructWorld.CSO_ConstructWorld"));
-    static const ConstructorHelpers::FObjectFinder<UCrowdyServerObjectDefinition> ProgressAsset(TEXT("/Game/ServerObjects/CSO_ConstructProgress.CSO_ConstructProgress"));
-    WorldDefinition = WorldAsset.Object;
-    ProgressDefinition = ProgressAsset.Object;
 }
 
 bool UConstructHubSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) const
@@ -205,6 +195,13 @@ void UConstructHubSubsystem::RefreshServerObjects()
         {
             ReleaseServerObjects();
             BoundUserId = UserId;
+        }
+        // Loaded here, never in a constructor: a failed lookup at startup leaves an empty package, and the SDK's newtype then
+        // refuses to make the asset on a clean project. Config/DefaultGame.ini always cooks the folder.
+        if (!WorldDefinition)
+        {
+            WorldDefinition = LoadObject<UCrowdyServerObjectDefinition>(nullptr, TEXT("/Game/ServerObjects/CSO_ConstructWorld.CSO_ConstructWorld"));
+            ProgressDefinition = LoadObject<UCrowdyServerObjectDefinition>(nullptr, TEXT("/Game/ServerObjects/CSO_ConstructProgress.CSO_ConstructProgress"));
         }
         FollowObject(WorldWatch, WorldDefinition, TEXT("main"));
         FollowObject(ProgressWatch, ProgressDefinition, LexToString(UserId));
