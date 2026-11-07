@@ -57,10 +57,9 @@ AConstructPresencePawn::AConstructPresencePawn()
 	Camera->bUsePawnControlRotation = true;
 
 	Entity = CreateDefaultSubobject<UCrowdyEntityComponent>(TEXT("Entity"));
-	Entity->Mode = ECrowdyEntityMode::Dynamic;
+	Entity->ReplicateMovement = ECrowdyReplicateMovement::On;
 	Entity->IdentityPolicy = ECrowdyIdentityPolicy::PlayerDerived;
-	Entity->Ownership = ECrowdyOwnership::LocalClient;
-	Entity->HostOverride = ECrowdyHostOverride::OwnerOnly;
+	Entity->OwnedBy = ECrowdyOwnedBy::Player;
 	Entity->bAutoRegister = true;
 
 	CapsuleBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CapsuleBody"));

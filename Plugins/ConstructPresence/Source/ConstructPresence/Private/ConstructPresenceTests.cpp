@@ -26,6 +26,7 @@
 #include "Misc/OutputDeviceRedirector.h"
 #include "Templates/Atomic.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Utils/CrowdySDKDeveloperSettings.h"
 
 // Friendship reaches the same pawn operations used by its live delegates without changing SDK state.
 struct FConstructPresenceTestAccess
@@ -105,9 +106,9 @@ struct FConstructPresenceTestAccess
 		return {Pawn.CapsuleBody.Get(), Pawn.CapsuleTop.Get(), Pawn.CapsuleBottom.Get()};
 	}
 
-	static ECrowdyHostOverride HostOverride(const AConstructPresencePawn& Pawn)
+	static const UCrowdyEntityComponent* Entity(const AConstructPresencePawn& Pawn)
 	{
-		return Pawn.Entity->HostOverride;
+		return Pawn.Entity.Get();
 	}
 
 	static void ArmReply(AConstructPresencePawn& Pawn,
@@ -692,8 +693,18 @@ bool FConstructPresenceCapsuleDefaultsTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	TestTrue(TEXT("Presence entity host override is owner-only"),
-	         FConstructPresenceTestAccess::HostOverride(*Defaults) == ECrowdyHostOverride::OwnerOnly);
+	const UCrowdyEntityComponent* Entity = FConstructPresenceTestAccess::Entity(*Defaults);
+	if (!TestNotNull(TEXT("Production presence class has its entity component"), Entity))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Presence entity is owned by its player"), Entity->OwnedBy == ECrowdyOwnedBy::Player);
+	TestTrue(TEXT("Presence entity replicates its movement"), Entity->ReplicateMovement == ECrowdyReplicateMovement::On);
+	TestTrue(TEXT("Presence entity identity derives from its player"),
+	         Entity->IdentityPolicy == ECrowdyIdentityPolicy::PlayerDerived);
+	// Under Elected Host an owner adopts host-sourced updates, so another client could rewrite a player's name.
+	TestTrue(TEXT("Leader Source stays Server Object, so the owner drops host-sourced updates"),
+	         GetDefault<UCrowdySDKDeveloperSettings>()->LeaderSource == ECrowdyLeaderSource::ServerObject);
 	const TArray<UStaticMeshComponent*> Parts = FConstructPresenceTestAccess::CapsuleParts(*Defaults);
 	const TArray<FString> ExpectedMeshes = {TEXT("/Engine/BasicShapes/Cylinder.Cylinder"),
 	                                        TEXT("/Engine/BasicShapes/Sphere.Sphere"),
