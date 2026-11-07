@@ -28,7 +28,7 @@ public:
 	/** Fires once per Report call, with the answer as one line of JSON. */
 	FOnConstructLayer4ProbeAnswer OnAnswer;
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunReadWorld(int32 Step);
 
 	/**
@@ -36,22 +36,22 @@ public:
 	 * Outcome pin, so check the object's status first, then bind On Status Changed: Ready goes to ReportProgress, Failed to
 	 * ReportReadRefused with Get Failure Reason. A Get node alone answers defaults on a refused read.
 	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunReadProgress(int32 Step, const FString& InstanceId);
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunListPrograms(int32 Step);
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunListClaims(int32 Step, bool bOnlyChunk, const FConstructHubChunk& Chunk, bool bOnlyMine, int32 Limit);
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunRecordClaim(int32 Step, int64 GridId, const FConstructHubChunk& Chunk);
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunReleaseClaim(int32 Step, int64 GridId);
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Construct|Layer4Check")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Construct|Layer4Check")
 	void RunForgetClaim(int32 Step, int64 GridId);
 
 	UFUNCTION(BlueprintCallable, Category = "Construct|Layer4Check")
