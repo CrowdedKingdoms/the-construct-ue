@@ -30,7 +30,6 @@ class CONSTRUCTHUB_API UConstructHubSubsystem final : public UWorldSubsystem
     GENERATED_BODY()
 
 public:
-    UConstructHubSubsystem();
     virtual void OnWorldBeginPlay(UWorld& InWorld) override;
     virtual void Deinitialize() override;
 
