@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Construct World",
+	"Description": "World-space instanced chunk cubes and an editable local chunk preview.",
+	"Category": "Construct",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "ConstructWorld",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "CrowdySDK",
+			"Enabled": true
+		}
+	]
+}
