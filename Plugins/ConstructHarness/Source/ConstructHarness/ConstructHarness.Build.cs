@@ -10,6 +10,7 @@ public class ConstructHarness : ModuleRules
 			"ConstructHub",
 			"ConstructPresence",
 			"ConstructShell",
+			"ConstructWorld",
 			"Core",
 			"CoreUObject",
 			"CrowdyExec",

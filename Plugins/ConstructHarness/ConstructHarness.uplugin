@@ -14,6 +14,7 @@
     { "Name": "ConstructHub", "Enabled": true },
     { "Name": "ConstructPresence", "Enabled": true },
     { "Name": "ConstructShell", "Enabled": true },
+    { "Name": "ConstructWorld", "Enabled": true },
     { "Name": "CrowdySDK", "Enabled": true }
   ]
 }
