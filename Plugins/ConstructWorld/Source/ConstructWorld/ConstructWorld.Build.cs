@@ -15,9 +15,13 @@ public class ConstructWorld : ModuleRules
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
+            "ConstructShell",
             "CrowdyExec",
             "CrowdyNet",
-            "CrowdySDK"
+            "CrowdySDK",
+            "InputCore",
+            "Slate",
+            "SlateCore"
         });
         if (Target.bBuildEditor)
         {

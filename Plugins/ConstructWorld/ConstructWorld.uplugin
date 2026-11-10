@@ -20,6 +20,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "ConstructShell",
+			"Enabled": true
+		},
+		{
 			"Name": "CrowdySDK",
 			"Enabled": true
 		}

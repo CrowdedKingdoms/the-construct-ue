@@ -4,9 +4,16 @@
 
 namespace ConstructChunkDrawing
 {
+    inline constexpr int32 BlockMaterialCount = 12;
     inline constexpr int32 CellsPerAxis = 16;
     inline constexpr int32 CellsPerChunk = CellsPerAxis * CellsPerAxis * CellsPerAxis;
     inline constexpr double EngineCubeSize = 100.0;
+
+    inline FString GetBlockMaterialPath(int32 Type)
+    {
+        const FString Name = FString::Printf(TEXT("MI_ConstructBlock%02d"), Type);
+        return FString::Printf(TEXT("/Game/Construct/World/%s.%s"), *Name, *Name);
+    }
 
     inline bool IsInsideChunk(const FIntVector& Cell)
     {
