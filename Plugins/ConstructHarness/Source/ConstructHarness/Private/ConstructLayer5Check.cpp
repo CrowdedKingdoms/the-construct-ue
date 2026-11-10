@@ -1,6 +1,7 @@
 #include "ConstructLayer5Check.h"
 
 #include "ConstructChunkView.h"
+#include "ConstructHarnessDigest.h"
 #include "ConstructHarnessLog.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -10,7 +11,6 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
-#include "Misc/SecureHash.h"
 #include "Subsystem/CrowdyAuthentication.h"
 #include "Subsystem/CrowdyGameSession.h"
 #include "Subsystem/CrowdySDKSubsystem.h"
@@ -35,13 +35,6 @@ namespace
 		{12, 4, 8}, {12, 5, 8}, {12, 6, 8}, {12, 7, 8},
 		{4, 12, 13}, {4, 12, 14},
 		{15, 15, 15}};
-
-	FString GridDigest(const TArray<uint8>& Grid)
-	{
-		FSHAHash Hash;
-		FSHA1::HashBuffer(Grid.GetData(), Grid.Num(), Hash.Hash);
-		return Hash.ToString().ToLower();
-	}
 }
 
 bool UConstructLayer5CheckSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -208,7 +201,7 @@ void UConstructLayer5CheckSubsystem::HandleFetch(const FCrowdyChunkFetch& Fetch)
 	for (const FCrowdyVoxelChunk& Chunk : Fetch.Chunks)
 	{
 		UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer5Check: chunk %lld %lld %lld sha1 %s truncated %d"),
-			Chunk.X, Chunk.Y, Chunk.Z, *GridDigest(Chunk.Grid), Chunk.bEditsTruncated ? 1 : 0);
+			Chunk.X, Chunk.Y, Chunk.Z, *ConstructHarness::GridDigest(Chunk.Grid), Chunk.bEditsTruncated ? 1 : 0);
 	}
 	UE_LOG(LogConstructHarness, Log, TEXT("ConstructLayer5Check: cubes %d"), DrawView->GetCubeCount());
 	for (const FIntVector& Cell : ExpectedCells)

@@ -16,7 +16,7 @@ struct FConstructPaintTestAccess
 
 namespace
 {
-    constexpr auto TestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+    constexpr auto PaintTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 
     struct FPaintFixture
     {
@@ -35,7 +35,7 @@ namespace
     };
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintLocation, "Construct.Paint.Canvas.Location", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintLocation, "Construct.Paint.Canvas.Location", PaintTestFlags)
 bool FConstructPaintLocation::RunTest(const FString&)
 {
     const FPaintFixture Fixture;
@@ -50,7 +50,7 @@ bool FConstructPaintLocation::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintFloor, "Construct.Paint.Canvas.FloorOnly", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintFloor, "Construct.Paint.Canvas.FloorOnly", PaintTestFlags)
 bool FConstructPaintFloor::RunTest(const FString&)
 {
     const FPaintFixture Fixture;
@@ -61,7 +61,7 @@ bool FConstructPaintFloor::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintType, "Construct.Paint.Canvas.BlockTypes", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPaintType, "Construct.Paint.Canvas.BlockTypes", PaintTestFlags)
 bool FConstructPaintType::RunTest(const FString&)
 {
     const FPaintFixture Fixture;
