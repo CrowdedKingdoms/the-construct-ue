@@ -10,7 +10,7 @@ impl Functions for ConstructWorldState {
                 ProgramId: 1,
                 SceneId: "paint".to_string(),
                 Name: "Paint".to_string(),
-                Description: "A shared 2D canvas. Click to paint voxels everyone sees, live and persisted.".to_string(),
+                Description: "A shared 3D canvas. Place and erase voxel blocks together.".to_string(),
             }],
         })
     }
@@ -42,6 +42,10 @@ mod tests {
         assert_eq!(reply.Programs[0].ProgramId, 1);
         assert_eq!(reply.Programs[0].SceneId, "paint");
         assert_eq!(reply.Programs[0].Name, "Paint");
+        assert_eq!(
+            reply.Programs[0].Description,
+            "A shared 3D canvas. Place and erase voxel blocks together."
+        );
     }
 
     #[test]

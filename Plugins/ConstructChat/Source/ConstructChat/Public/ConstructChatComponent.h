@@ -14,10 +14,7 @@ struct FCrowdySendRefusal;
 class UConstructChatComponent;
 class UConstructChatPanel;
 class UConstructUIInputSubsystem;
-class UEnhancedInputComponent;
-class UEnhancedInputLocalPlayerSubsystem;
-class UInputAction;
-class UInputMappingContext;
+class UInputComponent;
 class SEditableTextBox;
 
 /** One membership request, isolated from later requests and account changes. */
@@ -124,6 +121,7 @@ private:
 	void CancelGameplayFocusRestore();
 	void ResetSession();
 	void RefreshVisibility();
+	void TogglePanel();
 	void Append(const FString& Line);
 	void Memberships(const TArray<FCrowdyChannelMembership>& Values);
 	void Failed(FCrowdyChannelError Error, FString Message);
@@ -150,14 +148,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UConstructChatPanel> Panel;
 	UPROPERTY(Transient)
-	TObjectPtr<UEnhancedInputComponent> ChatInput;
-	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> OpenAction;
-	UPROPERTY(Transient)
-	TObjectPtr<UInputMappingContext> ChatContext;
+	TObjectPtr<UInputComponent> ChatInput;
 	TWeakObjectPtr<UGameInstance> RuntimeInstance;
 	TWeakObjectPtr<APlayerController> InputController;
-	TWeakObjectPtr<UEnhancedInputLocalPlayerSubsystem> EnhancedSubsystem;
 	TWeakObjectPtr<UConstructUIInputSubsystem> InputGate;
 	FTimerHandle GameplayFocusTimer;
 	uint64 SessionGeneration = 0;
@@ -166,6 +159,7 @@ private:
 	int32 SetupAttemptsRemaining = 0;
 	bool bRuntimeActive = false;
 	bool bComposerOpen = false;
+	bool bShowHistory = true;
 	bool bChannelMode = false;
 	bool bLoading = false;
 	bool bCanPublish = false;

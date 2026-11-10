@@ -21,7 +21,6 @@ public class ConstructChat : ModuleRules
             "ConstructShell",
             "CrowdyReplication",
             "CrowdySDK",
-            "EnhancedInput",
             "InputCore",
             "Slate"
         });

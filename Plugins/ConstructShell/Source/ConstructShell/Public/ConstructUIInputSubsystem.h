@@ -1,12 +1,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Subsystems/LocalPlayerSubsystem.h"
 #include "ConstructUIInputSubsystem.generated.h"
 
 class UUserWidget;
 class APlayerController;
 class APawn;
+class UInputComponent;
+class UGameViewportClient;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FConstructGameplayInputChanged, bool, bAllowed);
 
@@ -34,7 +37,10 @@ public:
 	FConstructGameplayInputChanged OnGameplayInputChanged;
 
 private:
+	friend class FConstructHUDReleasesInputManagementTest;
 	void ApplyInput();
+	void TogglePointerInteraction();
+	void ReleaseControllerInput();
 	void ObservePawn(APawn* Pawn);
 	UFUNCTION()
 	void PawnChanged(APawn* OldPawn, APawn* NewPawn);
@@ -44,7 +50,15 @@ private:
 	void ApplicationActivated();
 	TMap<FName, TWeakObjectPtr<UUserWidget>> Modals;
 	TArray<FName> ModalOrder;
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponent> PointerInput;
 	TWeakObjectPtr<APlayerController> AppliedController;
+	TWeakObjectPtr<UGameViewportClient> AppliedViewport;
+	EMouseCaptureMode PreviousMouseCapture = EMouseCaptureMode::NoCapture;
+	EMouseLockMode PreviousMouseLock = EMouseLockMode::DoNotLock;
+	bool bPreviousHideCursorDuringCapture = false;
+	bool bPreviousIgnoreViewportInput = false;
+	bool bPreviousShowCursor = false;
 	TWeakObjectPtr<APawn> ObservedPawn;
 	TWeakObjectPtr<UUserWidget> AppliedFocus;
 	FDelegateHandle DeactivatedHandle;
@@ -54,5 +68,7 @@ private:
 	bool bApplicationActive = true;
 	bool bApplied = false;
 	bool bLastAllowed = false;
+	bool bPointerInteraction = false;
+	bool bLastPointerInteraction = false;
 	bool bOwnsMovementBlock = false;
 };

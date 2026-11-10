@@ -36,16 +36,20 @@ FText UConstructConnectionStatus::GetStatusCaption() const
 TSharedRef<SWidget> UConstructConnectionStatus::RebuildWidget()
 {
 	const TWeakObjectPtr<UConstructConnectionStatus> WeakThis(this);
-	return SNew(SHorizontalBox) +
+	return SNew(SHorizontalBox).Visibility(EVisibility::SelfHitTestInvisible) +
 	       SHorizontalBox::Slot()
 	           .FillWidth(1)
 	           .VAlign(VAlign_Bottom)
 	           .Padding(20)[SNew(STextBlock)
 	                            .Font(FCoreStyle::GetDefaultFontStyle("Regular", 12))
+	                            .Visibility(EVisibility::HitTestInvisible)
 	                            .Text_Lambda(
 	                                [WeakThis]()
 	                                {
-		                                return WeakThis.IsValid() ? WeakThis->GetStatusCaption() : FText::GetEmpty();
+		                                return WeakThis.IsValid()
+		                                           ? FText::Format(LOCTEXT("StatusAndCursor", "{0}   |   F4: Toggle cursor"),
+		                                                           WeakThis->GetStatusCaption())
+		                                           : FText::GetEmpty();
 	                                })] +
 	       SHorizontalBox::Slot()
 	           .AutoWidth()

@@ -1,5 +1,6 @@
 #include "ConstructChatComponent.h"
 
+#include "Components/InputComponent.h"
 #include "ConstructUIInputSubsystem.h"
 #include "ConstructPresencePawn.h"
 #include "Containers/StringConv.h"
@@ -7,14 +8,9 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
-#include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
-#include "EnhancedPlayerInput.h"
 #include "GameFramework/PlayerController.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
-#include "InputAction.h"
-#include "InputMappingContext.h"
 #include "Network/CrowdyCpp/CrowdyCppReplicationSubsystem.h"
 #include "Replication/Subsystems/CrowdyEntitySubsystem.h"
 #include "Subsystem/CrowdyAuthentication.h"
@@ -175,25 +171,15 @@ bool UConstructChatComponent::RefreshLocalPresentation()
 			Gate->OnGameplayInputChanged.AddUniqueDynamic(this, &ThisClass::GameplayInputChanged);
 		}
 	}
-	UEnhancedInputLocalPlayerSubsystem* Enhanced = Player->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
-	if (!ChatInput && Enhanced && Cast<UEnhancedPlayerInput>(Controller->PlayerInput))
+	if (!ChatInput)
 	{
 		InputController = Controller;
-		EnhancedSubsystem = Enhanced;
-		OpenAction = NewObject<UInputAction>(this, TEXT("IA_ConstructChatOpen"));
-		OpenAction->ValueType = EInputActionValueType::Boolean;
-		ChatContext = NewObject<UInputMappingContext>(this, TEXT("IMC_ConstructChat"));
-		ChatContext->MapKey(OpenAction, EKeys::Enter);
-		ChatInput = NewObject<UEnhancedInputComponent>(Controller);
+		ChatInput = NewObject<UInputComponent>(Controller);
 		ChatInput->Priority = 60;
-		ChatInput->bBlockInput = false;
 		ChatInput->RegisterComponent();
-		ChatInput->BindAction(OpenAction, ETriggerEvent::Started, this, &ThisClass::OpenComposer);
+		ChatInput->BindKey(EKeys::Enter, IE_Pressed, this, &ThisClass::OpenComposer);
+		ChatInput->BindKey(EKeys::F3, IE_Pressed, this, &ThisClass::TogglePanel);
 		Controller->PushInputComponent(ChatInput);
-		FModifyContextOptions Options;
-		Options.bIgnoreAllPressedKeysUntilRelease = true;
-		Options.bForceImmediately = true;
-		Enhanced->AddMappingContext(ChatContext, 60, Options);
 	}
 	if (!Panel && GetWorld()->GetGameViewport())
 	{
@@ -224,8 +210,27 @@ void UConstructChatComponent::RefreshVisibility()
 {
 	if (Panel)
 	{
-		Panel->SetVisibility(bRuntimeActive && IsSignedIn() ? ESlateVisibility::SelfHitTestInvisible
-		                                                    : ESlateVisibility::Collapsed);
+		const bool bShowPanel = bRuntimeActive && IsSignedIn() && (bShowHistory || bComposerOpen);
+		Panel->SetVisibility(bShowPanel ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UConstructChatComponent::TogglePanel()
+{
+	const UConstructUIInputSubsystem* Gate = InputGate.Get();
+	if (!bRuntimeActive || !IsSignedIn() || !Gate || !Gate->CanUseNavigationInput(ChatModal))
+	{
+		return;
+	}
+	if (bComposerOpen)
+	{
+		bShowHistory = false;
+		CloseComposer();
+	}
+	else
+	{
+		bShowHistory = !bShowHistory;
+		RefreshVisibility();
 	}
 }
 
@@ -239,6 +244,7 @@ void UConstructChatComponent::OpenComposer()
 	}
 	CancelGameplayFocusRestore();
 	bComposerOpen = true;
+	RefreshVisibility();
 	Gate->SetModal(ChatModal, true, Panel);
 }
 
@@ -249,6 +255,7 @@ void UConstructChatComponent::CloseComposer()
 	if (Panel)
 	{
 		Panel->ClearComposer();
+		RefreshVisibility();
 	}
 	if (UConstructUIInputSubsystem* Gate = InputGate.Get(); bWasOpen && Gate)
 	{
@@ -705,10 +712,7 @@ void UConstructChatComponent::Connected()
 
 void UConstructChatComponent::ReleaseInput()
 {
-	if (UEnhancedInputLocalPlayerSubsystem* Enhanced = EnhancedSubsystem.Get(); Enhanced && ChatContext)
-	{
-		Enhanced->RemoveMappingContext(ChatContext);
-	}
+
 	if (APlayerController* Controller = InputController.Get(); Controller && ChatInput)
 	{
 		Controller->PopInputComponent(ChatInput);
@@ -718,9 +722,7 @@ void UConstructChatComponent::ReleaseInput()
 		ChatInput->DestroyComponent();
 	}
 	ChatInput = nullptr;
-	OpenAction = nullptr;
-	ChatContext = nullptr;
-	EnhancedSubsystem.Reset();
+
 	InputController.Reset();
 }
 

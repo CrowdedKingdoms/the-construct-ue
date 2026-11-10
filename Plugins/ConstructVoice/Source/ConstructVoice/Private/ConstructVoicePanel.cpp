@@ -188,7 +188,7 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 	             })
 	         .TextStyle(&Style, "Construct.Text.Muted")
 	         .AutoWrapText(true)];
-	return SNew(SOverlay) +
+	return SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible) +
 	       SOverlay::Slot()
 	           .HAlign(HAlign_Right)
 	           .VAlign(VAlign_Top)

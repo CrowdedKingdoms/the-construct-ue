@@ -38,10 +38,21 @@ FReply UConstructChatPanel::NativeOnFocusReceived(const FGeometry& Geometry, con
 
 FReply UConstructChatPanel::NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
-	if (KeyEvent.GetKey() == EKeys::Escape && Chat() && Chat()->IsComposerOpen())
+	if (UConstructChatComponent* Component = Chat(); Component && Component->IsComposerOpen())
 	{
-		Chat()->CloseComposer();
-		return FReply::Handled();
+		if (KeyEvent.GetKey() == EKeys::Escape)
+		{
+			Component->CloseComposer();
+			return FReply::Handled();
+		}
+		if (KeyEvent.GetKey() == EKeys::F3)
+		{
+			if (!KeyEvent.IsRepeat())
+			{
+				Component->TogglePanel();
+			}
+			return FReply::Handled();
+		}
 	}
 	return Super::NativeOnPreviewKeyDown(Geometry, KeyEvent);
 }
@@ -207,14 +218,25 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	                  })[SNew(STextBlock).Text(LOCTEXT("Send", "Send")).TextStyle(&Style, "Construct.Text.Small")]]];
 	Content->AddSlot().AutoHeight().Padding(
 	    0, 6, 0, 0)[SNew(STextBlock)
-	                    .Text(LOCTEXT("Controls", "Enter: type / send    Escape: cancel"))
+	                    .Text(LOCTEXT("Controls", "Enter: type / send    Esc: cancel    F3: hide chat"))
 	                    .TextStyle(&Style, "Construct.Text.Small")];
-	return SNew(SOverlay) +
+	return SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible) +
 	       SOverlay::Slot()
 	           .HAlign(HAlign_Left)
-	           .VAlign(VAlign_Bottom)
-	           .Padding(FMargin(20, 20, 20, 64))[SNew(SBox).WidthOverride(
-	               430)[SNew(SBorder).BorderImage(Style.GetBrush("Construct.Panel")).Padding(16)[Content]]];
+	           .VAlign(VAlign_Top)
+	           .Padding(FMargin(20))
+	           [SNew(SBox).WidthOverride(430)
+	               [SNew(SBorder)
+	                    .BorderImage(Style.GetBrush("Construct.Panel"))
+	                    .Padding(16)
+	                    .OnMouseButtonDown_Lambda([](const FGeometry&, const FPointerEvent& Event)
+	                    {
+		                    if (Event.GetEffectingButton() == EKeys::LeftMouseButton)
+		                    {
+			                    return FReply::Handled();
+		                    }
+		                    return FReply::Unhandled();
+	                    })[Content]]];
 }
 
 #undef LOCTEXT_NAMESPACE
