@@ -1,4 +1,5 @@
 #include "ConstructChatComponent.h"
+#include "Components/InputComponent.h"
 #include "ConstructChatSubsystem.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -215,6 +216,20 @@ bool FConstructChatControllerReplacementTest::RunTest(const FString& Parameters)
 	OldLookup->Initialize(First);
 	First->ActiveLookup = OldLookup.Get();
 	First->bLoading = true;
+	UInputComponent* FirstInput = First->ChatInput.Get();
+	if (!TestNotNull(TEXT("Chat installed a key-binding component"), FirstInput))
+	{
+		return false;
+	}
+	TestTrue(TEXT("The old controller owns the exact input component"), FirstInput->GetOuter() == FirstController);
+	for (const FKey& Key : {EKeys::Enter, EKeys::F3})
+	{
+		TestTrue(*FString::Printf(TEXT("Chat bound %s to a fresh press"), *Key.ToString()),
+		         FirstInput->KeyBindings.ContainsByPredicate([&Key](const FInputKeyBinding& Binding)
+		         {
+			         return Binding.Chord.Key == Key && Binding.KeyEvent == IE_Pressed;
+		         }));
+	}
 	FirstController->ReceivedPlayer();
 	TestEqual(TEXT("Repeated observation preserves current history"), First->History.Num(), 1);
 
@@ -236,6 +251,9 @@ bool FConstructChatControllerReplacementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Old component has cleared visible private history"), First->GetHistory().IsEmpty());
 	TestTrue(TEXT("Old component has invalidated membership replies"), First->ActiveLookup == nullptr);
 	TestTrue(TEXT("Old component has released its input component"), First->ChatInput == nullptr);
+	TestFalse(TEXT("Controller replacement unregisters the old key bindings"), FirstInput->IsRegistered());
+	TestTrue(TEXT("The replacement owns its own key bindings"),
+	         Next->ChatInput && Next->ChatInput->GetOuter() == Replacement && Next->ChatInput != FirstInput);
 	TestTrue(TEXT("Old component has released its panel"), First->Panel == nullptr);
 	TestTrue(TEXT("Old component has detached its input gate"), !First->InputGate.IsValid());
 	TestTrue(TEXT("Authored component remains reusable rather than being destroyed"), IsValid(First));

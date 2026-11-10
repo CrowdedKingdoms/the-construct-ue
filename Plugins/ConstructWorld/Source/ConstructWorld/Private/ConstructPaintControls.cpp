@@ -133,6 +133,10 @@ TSharedRef<SWidget> AConstructPaintControls::BuildPalette()
     const TSharedRef<SVerticalBox> Contents = SNew(SVerticalBox);
     Contents->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 4.0f)
     [
+        SNew(STextBlock).Text(LOCTEXT("CursorHint", "F4: Toggle cursor"))
+    ];
+    Contents->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 4.0f)
+    [
         SNew(STextBlock).Text_Lambda([WeakThis]()
         {
             if (const AConstructPaintControls* Controls = WeakThis.Get(); Controls && Controls->SelectedType > 0)
@@ -198,7 +202,7 @@ TSharedRef<SWidget> AConstructPaintControls::BuildPalette()
             const AConstructPaintControls* Controls = WeakThis.Get();
             return Controls && Controls->CanPaint() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed;
         })
-        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(20.0f, 0.0f, 0.0f, 24.0f)
+        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(20.0f, 0.0f, 0.0f, 62.0f)
         [
             SNew(SBorder)
             .Padding(8.0f)
@@ -229,7 +233,7 @@ void AConstructPaintControls::PaintUnderCursor()
     APlayerController* Controller = InputController.Get();
     float X = 0.0f;
     float Y = 0.0f;
-    if (!CanPaint() || !Controller || !Controller->GetMousePosition(X, Y))
+    if (!CanPaint() || !Controller || !Controller->bShowMouseCursor || !Controller->GetMousePosition(X, Y))
     {
         return;
     }

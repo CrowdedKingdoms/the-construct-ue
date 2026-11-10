@@ -1,13 +1,17 @@
 #include "ConstructUIInputSubsystem.h"
 #if WITH_DEV_AUTOMATION_TESTS
+#include "Components/InputComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "ConstructShellFramework.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
+#include "Slate/SceneViewport.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Widgets/SViewport.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructModalPolicyTest,
                                  "Construct.Shell.Input.NestedModalPolicy",
@@ -61,7 +65,16 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 		{
 			return false;
 		}
-		GEngine->CreateNewWorldContext(EWorldType::EditorPreview).SetCurrentWorld(World);
+		FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::EditorPreview);
+		WorldContext.SetCurrentWorld(World);
+		TStrongObjectPtr<UGameViewportClient> Viewport(NewObject<UGameViewportClient>(GEngine));
+		const TSharedRef<SViewport> ViewportWidget = SNew(SViewport);
+		TSharedPtr<FSceneViewport> SceneViewport = Viewport->CreateViewport(ViewportWidget);
+		Viewport->SetMouseCaptureMode(EMouseCaptureMode::CaptureDuringRightMouseDown);
+		Viewport->SetMouseLockMode(EMouseLockMode::LockInFullscreen);
+		Viewport->SetHideCursorDuringCapture(true);
+		Viewport->SetIgnoreInput(true);
+		WorldContext.GameViewport = Viewport.Get();
 		TStrongObjectPtr<ULocalPlayer> Local;
 		bool bPlayerAdded = false;
 		ON_SCOPE_EXIT
@@ -70,6 +83,7 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 			{
 				Local->PlayerRemoved();
 			}
+			SceneViewport.Reset();
 			GEngine->DestroyWorldContext(World);
 			World->DestroyWorld(false);
 		};
@@ -99,9 +113,10 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 		HUD->DispatchBeginPlay();
 		TestTrue(*FString::Printf(TEXT("%s: the real HUD entered play"), *Case), HUD->HasActorBegunPlay());
 		Local.Reset(NewObject<ULocalPlayer>(GEngine));
-		Local->PlayerAdded(nullptr, int32(0));
+		Local->PlayerAdded(Viewport.Get(), int32(0));
 		bPlayerAdded = true;
 		Controller->SetPlayer(Local.Get());
+		Controller->bShowMouseCursor = true;
 		UConstructUIInputSubsystem* Gate = Local->GetSubsystem<UConstructUIInputSubsystem>();
 		if (!TestNotNull(*FString::Printf(TEXT("%s: actual LocalPlayer owns its input gate"), *Case), Gate))
 		{
@@ -110,6 +125,8 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 		TestTrue(*FString::Printf(TEXT("%s: HUD resolves the same LocalPlayer used by the test"), *Case),
 		         HUD->GetOwningPlayerController()->GetLocalPlayer() == Local.Get());
 		Gate->SetSessionReady(bPreviouslyReady);
+		TestEqual(TEXT("The shell installed its requested capture mode"), Viewport->GetMouseCaptureMode(),
+		          bPreviouslyReady ? EMouseCaptureMode::CapturePermanently : EMouseCaptureMode::CaptureDuringMouseDown);
 		TestEqual(*FString::Printf(TEXT("%s: fixture installed the intended readiness"), *Case),
 		          Gate->IsGameplayInputAllowed(),
 		          bPreviouslyReady);
@@ -119,6 +136,31 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 		TestEqual(*FString::Printf(TEXT("%s: management actually reaches controller look input"), *Case),
 		          Controller->IsLookInputIgnored(),
 		          !bPreviouslyReady);
+		TestEqual(TEXT("Cursor is hidden in gameplay and available when input is blocked"),
+		          Controller->bShowMouseCursor != 0, !bPreviouslyReady);
+		if (bPreviouslyReady && TestNotNull(TEXT("The shell installed its controller input"), Gate->PointerInput.Get()))
+		{
+			const FInputKeyBinding* CursorBinding = Gate->PointerInput->KeyBindings.FindByPredicate(
+			    [](const FInputKeyBinding& Binding)
+			    {
+				    return Binding.Chord.Key == EKeys::F4 && Binding.KeyEvent == IE_Pressed;
+			    });
+			if (TestNotNull(TEXT("F4 is bound to the cursor toggle"), CursorBinding))
+			{
+				CursorBinding->KeyDelegate.Execute(EKeys::F4);
+				TestTrue(TEXT("F4 enables the cursor"), Controller->bShowMouseCursor);
+				CursorBinding->KeyDelegate.Execute(EKeys::F4);
+				TestFalse(TEXT("F4 returns to gameplay"), Controller->bShowMouseCursor);
+				CursorBinding->KeyDelegate.Execute(EKeys::F4);
+				const FName ChatModal(TEXT("ConstructChat"));
+				Gate->SetModal(ChatModal, true);
+				TestTrue(TEXT("Chat keeps the cursor visible"), Controller->bShowMouseCursor);
+				TestTrue(TEXT("Chat blocks look input"), Controller->IsLookInputIgnored());
+				Gate->SetModal(ChatModal, false);
+				TestFalse(TEXT("Closing chat clears pointer mode and hides the cursor"), Controller->bShowMouseCursor);
+				TestFalse(TEXT("Closing chat restores look input"), Controller->IsLookInputIgnored());
+			}
+		}
 		// DestroyActor is the operation under test. Removing the EndPlay ReleaseManagement line must make this red.
 		TestTrue(*FString::Printf(TEXT("%s: Engine destroys the actual shell HUD"), *Case), HUD->Destroy());
 		TestFalse(*FString::Printf(TEXT("%s: HUD destruction routed its actual EndPlay"), *Case),
@@ -127,6 +169,16 @@ bool FConstructHUDReleasesInputManagementTest::RunTest(const FString& Parameters
 		          Controller->IsMoveInputIgnored());
 		TestFalse(*FString::Printf(TEXT("%s: HUD teardown releases its own look-input block"), *Case),
 		          Controller->IsLookInputIgnored());
+		TestNull(TEXT("HUD teardown releases the cursor binding"), Gate->PointerInput.Get());
+		TestTrue(TEXT("HUD teardown restores the old cursor visibility"), Controller->bShowMouseCursor);
+		TestEqual(TEXT("HUD teardown restores the previous capture policy"), Viewport->GetMouseCaptureMode(),
+		          EMouseCaptureMode::CaptureDuringRightMouseDown);
+		TestEqual(TEXT("HUD teardown restores the previous lock policy"), Viewport->GetMouseLockMode(),
+		          EMouseLockMode::LockInFullscreen);
+		TestTrue(TEXT("HUD teardown restores the previous cursor-capture visibility"), Viewport->HideCursorDuringCapture());
+		TestTrue(TEXT("HUD teardown restores the previous viewport input policy"), Viewport->IgnoreInput());
+		TestTrue(TEXT("HUD teardown releases Slate mouse capture"), Local->GetSlateOperations().ShouldReleaseMouse());
+		TestTrue(TEXT("HUD teardown releases Slate mouse lock"), Local->GetSlateOperations().ShouldReleaseMouseLock());
 		TestFalse(*FString::Printf(TEXT("%s: old session readiness is cleared after HUD teardown"), *Case),
 		          Gate->IsGameplayInputAllowed());
 		TestFalse(*FString::Printf(TEXT("%s: old readiness cannot authorize navigation"), *Case),

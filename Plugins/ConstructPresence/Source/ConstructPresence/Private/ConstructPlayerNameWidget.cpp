@@ -210,7 +210,7 @@ public:
 			                                                return FReply::Handled();
 		                                                })[SNew(STextBlock).Text(LOCTEXT("Close", "Close"))]]];
 
-		ChildSlot[SNew(SOverlay) +
+		ChildSlot[SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible) +
 		          SOverlay::Slot()
 		              .HAlign(HAlign_Right)
 		              .VAlign(VAlign_Top)

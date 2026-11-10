@@ -1,6 +1,8 @@
 #include "ConstructUIInputSubsystem.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Components/InputComponent.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -47,6 +49,8 @@ void UConstructUIInputSubsystem::SetSessionReady(bool bReady)
 
 void UConstructUIInputSubsystem::ReleaseManagement()
 {
+	ReleaseControllerInput();
+	bPointerInteraction = false;
 	if (APlayerController* Controller = AppliedController.Get())
 	{
 		Controller->OnPossessedPawnChanged.RemoveDynamic(this, &ThisClass::PawnChanged);
@@ -86,6 +90,44 @@ bool UConstructUIInputSubsystem::CanUseNavigationInput(FName AllowedModal, FName
 	return true;
 }
 
+void UConstructUIInputSubsystem::TogglePointerInteraction()
+{
+	if (IsGameplayInputAllowed())
+	{
+		bPointerInteraction = !bPointerInteraction;
+		ApplyInput();
+	}
+}
+
+void UConstructUIInputSubsystem::ReleaseControllerInput()
+{
+	if (APlayerController* Controller = AppliedController.Get())
+	{
+		Controller->bShowMouseCursor = bPreviousShowCursor;
+		if (PointerInput)
+		{
+			Controller->PopInputComponent(PointerInput);
+		}
+	}
+	if (PointerInput)
+	{
+		PointerInput->DestroyComponent();
+		PointerInput = nullptr;
+	}
+	if (UGameViewportClient* Viewport = AppliedViewport.Get())
+	{
+		if (ULocalPlayer* Player = GetLocalPlayer(); Player && Player->ViewportClient == Viewport)
+		{
+			Player->GetSlateOperations().ReleaseMouseCapture().ReleaseMouseLock().CancelFocusRequest();
+		}
+		Viewport->SetMouseCaptureMode(PreviousMouseCapture);
+		Viewport->SetMouseLockMode(PreviousMouseLock);
+		Viewport->SetHideCursorDuringCapture(bPreviousHideCursorDuringCapture);
+		Viewport->SetIgnoreInput(bPreviousIgnoreViewportInput);
+	}
+	AppliedViewport.Reset();
+}
+
 void UConstructUIInputSubsystem::ApplyInput()
 {
 	if (!bManaged)
@@ -94,6 +136,10 @@ void UConstructUIInputSubsystem::ApplyInput()
 	}
 	APlayerController* Controller = GetLocalPlayer() ? GetLocalPlayer()->GetPlayerController(GetWorld()) : nullptr;
 	const bool bAllowed = IsGameplayInputAllowed();
+	if (!bAllowed)
+	{
+		bPointerInteraction = false;
+	}
 	UUserWidget* Focus = nullptr;
 	for (int32 Index = ModalOrder.Num() - 1; Index >= 0; --Index)
 	{
@@ -110,6 +156,8 @@ void UConstructUIInputSubsystem::ApplyInput()
 	}
 	if (AppliedController.Get() != Controller)
 	{
+		ReleaseControllerInput();
+		bPointerInteraction = false;
 		if (APlayerController* Previous = AppliedController.Get())
 		{
 			Previous->OnPossessedPawnChanged.RemoveDynamic(this, &ThisClass::PawnChanged);
@@ -119,6 +167,12 @@ void UConstructUIInputSubsystem::ApplyInput()
 		{
 			Controller->OnPossessedPawnChanged.AddUniqueDynamic(this, &ThisClass::PawnChanged);
 			ObservePawn(Controller->GetPawn());
+			bPreviousShowCursor = Controller->bShowMouseCursor;
+			PointerInput = NewObject<UInputComponent>(Controller);
+			PointerInput->Priority = 70;
+			PointerInput->RegisterComponent();
+			PointerInput->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::TogglePointerInteraction);
+			Controller->PushInputComponent(PointerInput);
 		}
 		if (APlayerController* Previous = AppliedController.Get(); Previous && bOwnsMovementBlock)
 		{
@@ -131,13 +185,15 @@ void UConstructUIInputSubsystem::ApplyInput()
 	}
 	const bool bLostInputBlock = Controller && !bAllowed && bOwnsMovementBlock &&
 	                             (!Controller->IsMoveInputIgnored() || !Controller->IsLookInputIgnored());
-	if (bApplied && bLastAllowed == bAllowed && AppliedFocus.Get() == Focus && !bLostInputBlock)
+	if (bApplied && bLastAllowed == bAllowed && bLastPointerInteraction == bPointerInteraction &&
+	    AppliedFocus.Get() == Focus && !bLostInputBlock)
 	{
 		return;
 	}
 	const bool bChanged = !bApplied || bLastAllowed != bAllowed;
 	bApplied = true;
 	bLastAllowed = bAllowed;
+	bLastPointerInteraction = bPointerInteraction;
 	AppliedFocus = Focus;
 	if (Controller)
 	{
@@ -168,16 +224,28 @@ void UConstructUIInputSubsystem::ApplyInput()
 			Controller->SetIgnoreLookInput(false);
 			bOwnsMovementBlock = false;
 		}
-		Controller->bShowMouseCursor = true;
-		if (Focus)
+		if (UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport(); Viewport && !AppliedViewport.IsValid())
+		{
+			AppliedViewport = Viewport;
+			PreviousMouseCapture = Viewport->GetMouseCaptureMode();
+			PreviousMouseLock = Viewport->GetMouseLockMode();
+			bPreviousHideCursorDuringCapture = Viewport->HideCursorDuringCapture();
+			bPreviousIgnoreViewportInput = Viewport->IgnoreInput();
+		}
+		Controller->bShowMouseCursor = !bAllowed || bPointerInteraction;
+		if (Controller->bShowMouseCursor)
 		{
 			FInputModeGameAndUI Mode;
-			Mode.SetWidgetToFocus(Focus->TakeWidget());
+			Mode.SetHideCursorDuringCapture(false);
+			if (Focus)
+			{
+				Mode.SetWidgetToFocus(Focus->TakeWidget());
+			}
 			Controller->SetInputMode(Mode);
 		}
-		else if (bAllowed)
+		else
 		{
-			Controller->SetInputMode(FInputModeGameAndUI());
+			Controller->SetInputMode(FInputModeGameOnly());
 		}
 	}
 	if (bChanged)

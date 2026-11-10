@@ -2,7 +2,7 @@
 
 This Runtime plugin installs one chat component per local PlayerController in Game and PIE worlds. It preserves an existing component and adds none to remote controllers. Native local-player/controller events handle late assignment and replacement without permanent polling. Components complete local setup if an authored component began play before its controller became local.
 
-The component owns its shared-theme panel. Signed-in players see the last 100 lines at the lower left. Enhanced Input Enter opens the composer; Enter in its text field sends and closes, and Escape cancels. The shell input gate owns movement/look blocking and focus. Sign-out, access end, account changes and teardown clear history and pending requests. The short setup retry stops after presentation/input is ready or ten seconds.
+The component owns its shared-theme panel. Signed-in players see the last 100 lines at the upper left. F3 hides or shows the panel without clearing history. Enter opens the composer even when the panel is hidden; Enter in its text field sends and closes, and Escape cancels. The shell input gate owns movement/look blocking and focus. Use F4 to show the cursor for the channel selector and Refresh when the composer is closed. Sign-out, access end, account changes and teardown clear history and pending requests. The short setup retry stops after presentation/input is ready or ten seconds.
 
 Nearby chat is the default. It calls the SDK's UCrowdyProximityChat::SendProximityText(Text, 4), receives OnProximityTextReceived and shows OnProximityTextRefused as a late status notice. Sent means the line left this client, not that another player received it. Nothing copies SDK routing or changes chunk size. Refusals never cause automatic resends.
 

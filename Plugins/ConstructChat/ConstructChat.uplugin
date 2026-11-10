@@ -24,10 +24,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "EnhancedInput",
-			"Enabled": true
-		},
-		{
 			"Name": "ConstructPresence",
 			"Enabled": true
 		}
