@@ -7,10 +7,21 @@ public class ConstructWorld : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
+            "ConstructHub",
             "Core",
             "CoreUObject",
-            "Engine",
-            "CrowdyServices"
+            "CrowdyServices",
+            "Engine"
         });
+        PrivateDependencyModuleNames.AddRange(new[]
+        {
+            "CrowdyExec",
+            "CrowdyNet",
+            "CrowdySDK"
+        });
+        if (Target.bBuildEditor)
+        {
+            PrivateDependencyModuleNames.Add("AssetRegistry");
+        }
     }
 }
