@@ -16,6 +16,10 @@
 	],
 	"Plugins": [
 		{
+			"Name": "ConstructHub",
+			"Enabled": true
+		},
+		{
 			"Name": "CrowdySDK",
 			"Enabled": true
 		}
