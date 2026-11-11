@@ -70,6 +70,8 @@ void UConstructClaimsSubsystem::SignedIn(bool bSuccess, FString)
     if (bSuccess)
     {
         bSessionInvalidated = false;
+        // A restored session can start the first search before its app token exists; search again now it does.
+        bStarted = false;
         StartSearch();
     }
 }

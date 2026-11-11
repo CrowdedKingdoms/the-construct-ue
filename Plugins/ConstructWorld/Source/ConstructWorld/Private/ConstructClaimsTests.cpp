@@ -30,6 +30,10 @@ struct FConstructClaimsTestAccess
     {
         return Subsystem.PrepareInitialSearch(bSignedIn, Low, High);
     }
+    static void SignIn(UConstructClaimsSubsystem& Subsystem)
+    {
+        Subsystem.SignedIn(true, FString());
+    }
     static bool Bounds(const UConstructClaimsSubsystem& Subsystem, FInt64Vector& Low, FInt64Vector& High)
     {
         return Subsystem.GetPadBounds(Low, High);
@@ -111,7 +115,7 @@ struct FConstructClaimsTestAccess
 
 namespace
 {
-    constexpr auto Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+    constexpr auto ClaimTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 
     struct FClaimsFixture
     {
@@ -177,7 +181,7 @@ namespace
     }
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimLocation, "Construct.Claims.Location", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimLocation, "Construct.Claims.Location", ClaimTestFlags)
 bool FConstructClaimLocation::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -188,7 +192,7 @@ bool FConstructClaimLocation::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStates, "Construct.Claims.States", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStates, "Construct.Claims.States", ClaimTestFlags)
 bool FConstructClaimStates::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -207,7 +211,7 @@ bool FConstructClaimStates::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimInitialFailure, "Construct.Claims.InitialSearchFailure", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimInitialFailure, "Construct.Claims.InitialSearchFailure", ClaimTestFlags)
 bool FConstructClaimInitialFailure::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -222,7 +226,7 @@ bool FConstructClaimInitialFailure::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRefreshFailure, "Construct.Claims.RefreshFailure", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRefreshFailure, "Construct.Claims.RefreshFailure", ClaimTestFlags)
 bool FConstructClaimRefreshFailure::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -238,7 +242,20 @@ bool FConstructClaimRefreshFailure::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimBounds, "Construct.Claims.OneSearchBounds", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimSignInSearch, "Construct.Claims.SignInSearchesAgain", ClaimTestFlags)
+bool FConstructClaimSignInSearch::RunTest(const FString&)
+{
+    FClaimsFixture F;
+    FInt64Vector Low, High;
+    TestTrue(TEXT("A restored session starts the first search"), FConstructClaimsTestAccess::Initial(*F.Search, true, Low, High));
+    TestFalse(TEXT("A second start issues nothing"), FConstructClaimsTestAccess::Initial(*F.Search, true, Low, High));
+    FConstructClaimsTestAccess::SignIn(*F.Search);
+    TestTrue(TEXT("The sign-in that follows searches again, so a search sent before the app token is not the last"),
+        FConstructClaimsTestAccess::Initial(*F.Search, true, Low, High));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimBounds, "Construct.Claims.OneSearchBounds", ClaimTestFlags)
 bool FConstructClaimBounds::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -268,7 +285,7 @@ bool FConstructClaimBounds::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRefusedRecord, "Construct.Claims.RecordRefusal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRefusedRecord, "Construct.Claims.RecordRefusal", ClaimTestFlags)
 bool FConstructClaimRefusedRecord::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -286,7 +303,7 @@ bool FConstructClaimRefusedRecord::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimIdempotentRecord, "Construct.Claims.IdempotentRecord", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimIdempotentRecord, "Construct.Claims.IdempotentRecord", ClaimTestFlags)
 bool FConstructClaimIdempotentRecord::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -298,7 +315,7 @@ bool FConstructClaimIdempotentRecord::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimIdempotentRelease, "Construct.Claims.IdempotentRelease", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimIdempotentRelease, "Construct.Claims.IdempotentRelease", ClaimTestFlags)
 bool FConstructClaimIdempotentRelease::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -310,7 +327,7 @@ bool FConstructClaimIdempotentRelease::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRetries, "Construct.Claims.RecordRetries", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimRetries, "Construct.Claims.RecordRetries", ClaimTestFlags)
 bool FConstructClaimRetries::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -330,7 +347,7 @@ bool FConstructClaimRetries::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimBox, "Construct.Claims.BoxAndName", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimBox, "Construct.Claims.BoxAndName", ClaimTestFlags)
 bool FConstructClaimBox::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -365,7 +382,7 @@ bool FConstructClaimBox::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimGetter, "Construct.Claims.UnknownAndFreeGetter", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimGetter, "Construct.Claims.UnknownAndFreeGetter", ClaimTestFlags)
 bool FConstructClaimGetter::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -382,7 +399,7 @@ bool FConstructClaimGetter::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimReleaseOffer, "Construct.Claims.ReleaseOnlyMine", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimReleaseOffer, "Construct.Claims.ReleaseOnlyMine", ClaimTestFlags)
 bool FConstructClaimReleaseOffer::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -397,7 +414,7 @@ bool FConstructClaimReleaseOffer::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStaleSearch, "Construct.Claims.StaleSearch", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStaleSearch, "Construct.Claims.StaleSearch", ClaimTestFlags)
 bool FConstructClaimStaleSearch::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -412,7 +429,7 @@ bool FConstructClaimStaleSearch::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStaleName, "Construct.Claims.StaleName", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimStaleName, "Construct.Claims.StaleName", ClaimTestFlags)
 bool FConstructClaimStaleName::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -430,7 +447,7 @@ bool FConstructClaimStaleName::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimCancel, "Construct.Claims.SessionCancellation", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimCancel, "Construct.Claims.SessionCancellation", ClaimTestFlags)
 bool FConstructClaimCancel::RunTest(const FString&)
 {
     FClaimsFixture F;
@@ -454,7 +471,7 @@ bool FConstructClaimCancel::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimPendingSession, "Construct.Claims.PendingSessionAnswer", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimPendingSession, "Construct.Claims.PendingSessionAnswer", ClaimTestFlags)
 bool FConstructClaimPendingSession::RunTest(const FString&)
 {
     FClaimsFixture F;
