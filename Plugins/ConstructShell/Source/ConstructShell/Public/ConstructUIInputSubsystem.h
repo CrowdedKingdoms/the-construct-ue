@@ -11,6 +11,8 @@ class APawn;
 class UInputComponent;
 class UGameViewportClient;
 
+DECLARE_MULTICAST_DELEGATE(FConstructModsOpenRequested);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FConstructGameplayInputChanged, bool, bAllowed);
 
 /** Coordinates local shell/UI input only. It never pauses the world or manages SDK authentication. */
@@ -35,6 +37,10 @@ public:
 	bool CanUseNavigationInput(FName AllowedModal, FName AlternateModal = NAME_None) const;
 	UPROPERTY(BlueprintAssignable, Category = "Construct|UI")
 	FConstructGameplayInputChanged OnGameplayInputChanged;
+
+    /** Thin UI request only. ConstructWorld owns the menu and domain behavior. */
+    FConstructModsOpenRequested OnModsOpenRequested;
+    void RequestOpenMods();
 
 private:
 	friend class FConstructHUDReleasesInputManagementTest;

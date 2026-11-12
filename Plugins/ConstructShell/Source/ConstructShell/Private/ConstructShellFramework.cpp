@@ -52,7 +52,22 @@ TSharedRef<SWidget> UConstructConnectionStatus::RebuildWidget()
 		                                                           WeakThis->GetStatusCaption())
 		                                           : FText::GetEmpty();
 	                                })] +
-	       SHorizontalBox::Slot()
+	       SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(12, 20)
+           [
+               SNew(SButton).ContentPadding(FMargin(16, 8))
+               .OnClicked_Lambda([WeakThis]()
+               {
+                   if (UConstructConnectionStatus* Self = WeakThis.Get())
+                   {
+                       if (ULocalPlayer* Player = Self->GetOwningLocalPlayer())
+                       {
+                           Player->GetSubsystem<UConstructUIInputSubsystem>()->RequestOpenMods();
+                       }
+                   }
+                   return FReply::Handled();
+               })[SNew(STextBlock).Text(LOCTEXT("Mods", "Mods"))]
+           ] +
+           SHorizontalBox::Slot()
 	           .AutoWidth()
 	           .VAlign(VAlign_Bottom)
 	           .Padding(20)[SNew(SButton)

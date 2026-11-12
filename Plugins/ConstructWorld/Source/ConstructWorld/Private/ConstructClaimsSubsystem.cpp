@@ -95,6 +95,7 @@ void UConstructClaimsSubsystem::InvalidateSession()
     bSessionInvalidated = true;
     bStarted = false;
     LatestSearch.Reset();
+    Lookups.Reset();
     for (TActorIterator<AConstructClaimPad> It(GetWorld()); It; ++It)
     {
         It->ResetSession();
@@ -157,23 +158,81 @@ void UConstructClaimsSubsystem::Refresh(AConstructClaimPad& Pad)
     Search(Chunk, Chunk);
 }
 
-void UConstructClaimsSubsystem::Search(FInt64Vector Low, FInt64Vector High)
+uint64 UConstructClaimsSubsystem::BeginChunkLookup(FInt64Vector Chunk)
+{
+    if (!bLive || bSessionInvalidated)
+    {
+        return 0;
+    }
+    const uint64 Request = ++Serial;
+    MarkLookup(Chunk, Request);
+    return Request;
+}
+
+void UConstructClaimsSubsystem::MarkLookup(FInt64Vector Chunk, uint64 Request)
+{
+    LatestSearch.Add(Chunk, Request);
+    FConstructClaimLookup Lookup;
+    Lookup.Request = Request;
+    Lookups.Add(Chunk, MoveTemp(Lookup));
+    for (TActorIterator<AConstructClaimPad> It(GetWorld()); It; ++It)
+    {
+        if (It->GetClaimChunk() == Chunk)
+        {
+            It->bLatestSearchSucceeded = false;
+        }
+    }
+    OnLookupChanged.Broadcast(Chunk);
+}
+
+bool UConstructClaimsSubsystem::IsLatestLookup(FInt64Vector Chunk, uint64 Request) const
+{
+    return bLive && !bSessionInvalidated && Request != 0 && LatestSearch.FindRef(Chunk) == Request;
+}
+
+const FConstructClaimLookup* UConstructClaimsSubsystem::GetLookup(FInt64Vector Chunk) const
+{
+    return Lookups.Find(Chunk);
+}
+
+void UConstructClaimsSubsystem::FinishChunkLookup(FInt64Vector Chunk, uint64 Request, const FCrowdyClaimSearch& Result)
+{
+    SearchReturned(Chunk, Chunk, Request, Result);
+}
+
+uint64 UConstructClaimsSubsystem::Search(FInt64Vector Low, FInt64Vector High)
 {
     UGameInstance* Game = GetWorld()->GetGameInstance();
     UCrowdyClaims* Claims = Game ? Game->GetSubsystem<UCrowdyClaims>() : nullptr;
-    if (!Claims)
+    if (!Claims || !bLive || bSessionInvalidated)
     {
-        return;
+        return 0;
     }
     const uint64 Request = ++Serial;
     const uint64 ForSession = Session;
+    TArray<FInt64Vector> Chunks;
+    if (Low == High)
+    {
+        Chunks.Add(Low);
+    }
+    for (const auto& Pair : LatestSearch)
+    {
+        if (Inside(Pair.Key, Low, High))
+        {
+            Chunks.AddUnique(Pair.Key);
+        }
+    }
     for (TActorIterator<AConstructClaimPad> It(GetWorld()); It; ++It)
     {
         const FInt64Vector Chunk = It->GetClaimChunk();
         if (Inside(Chunk, Low, High))
         {
-            LatestSearch.Add(Chunk, Request);
+            Chunks.AddUnique(Chunk);
         }
+    }
+    for (const FInt64Vector Chunk : Chunks)
+    {
+        MarkLookup(Chunk, Request);
     }
     const TWeakObjectPtr<UConstructClaimsSubsystem> WeakThis(this);
     Claims->FindClaims(Low.X, Low.Y, Low.Z, High.X, High.Y, High.Z, [WeakThis, Low, High, Request, ForSession](const FCrowdyClaimSearch& Reply)
@@ -183,37 +242,72 @@ void UConstructClaimsSubsystem::Search(FInt64Vector Low, FInt64Vector High)
             Self->SearchReturned(Low, High, Request, Reply);
         }
     });
+    return Request;
 }
 
 void UConstructClaimsSubsystem::SearchReturned(FInt64Vector Low, FInt64Vector High, uint64 Request, const FCrowdyClaimSearch& Result)
 {
-    TSet<FInt64Vector> Changed;
-    bool bShowedFailure = false;
-    for (TActorIterator<AConstructClaimPad> It(GetWorld()); It; ++It)
+    TArray<FInt64Vector> Current;
+    for (const auto& Pair : LatestSearch)
     {
-        const FInt64Vector Chunk = It->GetClaimChunk();
-        if (!Inside(Chunk, Low, High) || LatestSearch.FindRef(Chunk) != Request)
+        if (Inside(Pair.Key, Low, High) && IsLatestLookup(Pair.Key, Request))
         {
-            continue;
+            Current.Add(Pair.Key);
         }
-        if (Result.Result != ECrowdyClaimResult::Success)
+    }
+    bool bShowedFailure = false;
+    for (const FInt64Vector Chunk : Current)
+    {
+        if (!IsLatestLookup(Chunk, Request))
         {
-            if (!bShowedFailure)
-            {
-                It->ShowFeedback(Result.Message.IsEmpty() ? TEXT("Could not check this chunk.") : Result.Message);
-                bShowedFailure = true;
-            }
             continue;
         }
         const FCrowdyChunkClaimInfo* Found = Result.Claims.FindByPredicate([Chunk](const FCrowdyChunkClaimInfo& Claim)
         {
             return FInt64Vector(Claim.ChunkX, Claim.ChunkY, Claim.ChunkZ) == Chunk;
         });
-        It->ShowSearch(Found);
-        Changed.Add(Chunk);
+        FConstructClaimLookup Lookup;
+        Lookup.Request = Request;
+        Lookup.bPending = false;
+        Lookup.bSucceeded = Result.Result == ECrowdyClaimResult::Success;
+        Lookup.Message = Result.Message;
+        if (Lookup.bSucceeded && Found)
+        {
+            Lookup.Claim = *Found;
+        }
+        Lookups.Add(Chunk, MoveTemp(Lookup));
+        for (TActorIterator<AConstructClaimPad> It(GetWorld()); It; ++It)
+        {
+            if (It->GetClaimChunk() != Chunk || !IsLatestLookup(Chunk, Request))
+            {
+                continue;
+            }
+            if (Result.Result == ECrowdyClaimResult::Success)
+            {
+                It->ShowSearch(Found);
+            }
+            else
+            {
+                It->bLatestSearchSucceeded = false;
+                if (!bShowedFailure)
+                {
+                    It->ShowFeedback(Result.Message.IsEmpty() ? TEXT("Could not check this chunk.") : Result.Message);
+                    bShowedFailure = true;
+                }
+            }
+        }
+        if (IsLatestLookup(Chunk, Request))
+        {
+            OnLookupChanged.Broadcast(Chunk);
+            if (Result.Result == ECrowdyClaimResult::Success && IsLatestLookup(Chunk, Request))
+            {
+                OnClaimsShown.Broadcast(Chunk.X, Chunk.Y, Chunk.Z);
+            }
+        }
     }
-    for (const FInt64Vector Chunk : Changed)
-    {
-        OnClaimsShown.Broadcast(Chunk.X, Chunk.Y, Chunk.Z);
-    }
+}
+uint64 UConstructClaimsSubsystem::ConfirmChunk(FInt64Vector Chunk)
+{
+    // A menu requests the lookup; the world owner finishes it even if that menu closes.
+    return Search(Chunk, Chunk);
 }

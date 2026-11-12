@@ -5,6 +5,8 @@
 #include "Subsystem/CrowdyClaims.h"
 #include "ConstructClaimPad.generated.h"
 
+class UConstructModMenu;
+class UConstructModPanel;
 class UBoxComponent;
 class UTextRenderComponent;
 class UStaticMeshComponent;
@@ -49,6 +51,9 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Construct|Claims")
     FConstructOwnerNamed OnOwnerNamed;
 
+    UFUNCTION(BlueprintCallable, Category = "Construct|Mods")
+    UConstructModPanel* OpenMods();
+
     FInt64Vector GetClaimChunk() const;
 
 protected:
@@ -56,6 +61,10 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
+    friend struct FConstructModsLifecycleTestAccess;
+    friend struct FConstructModsTestAccess;
+    friend class UConstructModsSubsystem;
+    friend class UConstructModMenu;
     friend class UConstructClaimsSubsystem;
     friend class UConstructClaimNameRequest;
     friend struct FConstructClaimsTestAccess;
@@ -111,6 +120,7 @@ private:
     TWeakObjectPtr<UGameViewportClient> FeedbackViewport;
     TSharedPtr<SWidget> FeedbackWidget;
 
+    bool bLatestSearchSucceeded = false;
     bool bKnown = false;
     int64 ShownGrid = 0;
     int64 ShownOwner = 0;
