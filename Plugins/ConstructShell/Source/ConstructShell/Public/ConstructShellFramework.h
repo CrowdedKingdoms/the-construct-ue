@@ -68,6 +68,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UConstructConnectionStatus> ConnectionStatus;
 	bool bShowingSignIn = false;
+	void ResumeAfterIdle();
+	// The player's last input time when the session was seen released for idleness; negative while it is not.
+	double AwaySince = -1.0;
 };
 
 UCLASS(Blueprintable)
