@@ -1,0 +1,11 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Webcam",
+  "Description": "Opt-in webcam video over presence pawns. Currently the shared types and a temporary stand-in.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [{"Name":"ConstructWebcam","Type":"Runtime","LoadingPhase":"Default"}]
+}
