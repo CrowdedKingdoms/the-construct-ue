@@ -24,6 +24,7 @@ public class ConstructHarness : ModuleRules
 			"CrowdySDK",
 			"CrowdyVoice",
 			"Json",
+			"UMG",
 		});
 	}
 }
