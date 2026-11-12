@@ -4,6 +4,7 @@
 #include "ConstructShellPresentation.h"
 #include "ConstructUIInputSubsystem.h"
 #include "Engine/LocalPlayer.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Engine/GameInstance.h"
 #include "ConstructPreviewPawn.h"
 #include "GameFramework/SpectatorPawn.h"
@@ -174,7 +175,30 @@ void AConstructShellHUD::PauseChanged(bool bPaused, const FString& Reason)
 void AConstructShellHUD::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	ResumeAfterIdle();
 	RefreshVisibility();
+}
+
+void AConstructShellHUD::ResumeAfterIdle()
+{
+	UGameInstance* Instance = GetGameInstance();
+	UCrowdySDKSubsystem* SDK = Instance ? Instance->GetSubsystem<UCrowdySDKSubsystem>() : nullptr;
+	if (!SDK || !FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	UCrowdyAuthentication* Auth = Instance->GetSubsystem<UCrowdyAuthentication>();
+	UCrowdyGameSession* Session = Instance->GetSubsystem<UCrowdyGameSession>();
+	FSlateApplication& Slate = FSlateApplication::Get();
+	const bool bCanResume = ConstructShellPresentation::CanResumeAfterIdle(
+	    bLocalPreview, Auth && Auth->IsSignedIn(), Session && Session->HasAccessEnded(), Slate.IsActive());
+	// Gameplay input is gated off while away, so the player's return is read from Slate rather than the pawn.
+	if (!ConstructShellPresentation::StepIdleResume(
+	        AwaySince, SDK->GetUDPConnectionState(), bCanResume, Slate.GetLastUserInteractionTime()))
+	{
+		return;
+	}
+	SDK->RequestUDPAccess();
 }
 
 void AConstructShellHUD::LoggedOut(bool bSuccess)

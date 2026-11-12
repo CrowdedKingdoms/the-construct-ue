@@ -34,6 +34,40 @@ bool FConstructShellPresentationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Missing SDK has explicit feedback"),
 	          ConnectionCaption(EUDPConnectionState::Disconnected, false, TEXT(""), false).ToString(),
 	          FString(TEXT("Crowdy unavailable")));
+	TestEqual(TEXT("A session released for idleness says how to come back"),
+	          ConnectionCaption(EUDPConnectionState::Inactive, false, TEXT(""), true).ToString(),
+	          FString(TEXT("Away: press any key to come back")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructShellIdleResumeTest,
+                                 "Construct.Shell.Lifecycle.IdleResume",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FConstructShellIdleResumeTest::RunTest(const FString& Parameters)
+{
+	using namespace ConstructShellPresentation;
+	constexpr EUDPConnectionState Away = EUDPConnectionState::Inactive;
+	double AwaySince = -1.0;
+	TestFalse(TEXT("Seeing the release does not resume"), StepIdleResume(AwaySince, Away, true, 100.0));
+	TestEqual(TEXT("The release records the last input time"), AwaySince, 100.0);
+	TestFalse(TEXT("No input since the release keeps the player away"), StepIdleResume(AwaySince, Away, true, 100.0));
+	TestFalse(TEXT("Input while a resume is not allowed is held back"), StepIdleResume(AwaySince, Away, false, 120.0));
+	TestTrue(TEXT("Input after the release brings the player back"), StepIdleResume(AwaySince, Away, true, 120.0));
+	TestFalse(TEXT("The same input resumes only once"), StepIdleResume(AwaySince, Away, true, 120.0));
+	TestTrue(TEXT("Newer input resumes again"), StepIdleResume(AwaySince, Away, true, 130.0));
+	TestFalse(TEXT("A connected session needs no resume"),
+	          StepIdleResume(AwaySince, EUDPConnectionState::Connected, true, 140.0));
+	TestEqual(TEXT("Leaving Inactive forgets the release"), AwaySince, -1.0);
+	TestFalse(TEXT("A dropped connection is the SDK's reconnect, not an idle resume"),
+	          StepIdleResume(AwaySince, EUDPConnectionState::Disconnected, true, 150.0));
+	TestFalse(TEXT("A second release starts from its own last input"), StepIdleResume(AwaySince, Away, true, 150.0));
+
+	TestTrue(TEXT("A signed-in focused player may resume"), CanResumeAfterIdle(false, true, false, true));
+	TestFalse(TEXT("Local preview never opens a session"), CanResumeAfterIdle(true, true, false, true));
+	TestFalse(TEXT("A signed-out player has no token to resume with"), CanResumeAfterIdle(false, false, false, true));
+	TestFalse(TEXT("Ended access is not resumed"), CanResumeAfterIdle(false, true, true, true));
+	TestFalse(TEXT("A mouse over an unfocused window is not a return"), CanResumeAfterIdle(false, true, false, false));
 	return true;
 }
 
