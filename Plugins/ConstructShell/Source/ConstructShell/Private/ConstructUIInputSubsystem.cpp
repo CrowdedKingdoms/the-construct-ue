@@ -47,6 +47,14 @@ void UConstructUIInputSubsystem::SetSessionReady(bool bReady)
 	ApplyInput();
 }
 
+void UConstructUIInputSubsystem::RequestOpenMods()
+{
+    if (bSessionReady && bApplicationActive)
+    {
+        OnModsOpenRequested.Broadcast();
+    }
+}
+
 void UConstructUIInputSubsystem::ReleaseManagement()
 {
 	ReleaseControllerInput();
@@ -299,5 +307,6 @@ void UConstructUIInputSubsystem::Deinitialize()
 	Modals.Reset();
 	ModalOrder.Reset();
 	OnGameplayInputChanged.Clear();
+    OnModsOpenRequested.Clear();
 	Super::Deinitialize();
 }

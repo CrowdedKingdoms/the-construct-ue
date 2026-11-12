@@ -11,7 +11,8 @@ public class ConstructWorld : ModuleRules
             "Core",
             "CoreUObject",
             "CrowdyServices",
-            "Engine"
+            "Engine",
+            "UMG"
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {

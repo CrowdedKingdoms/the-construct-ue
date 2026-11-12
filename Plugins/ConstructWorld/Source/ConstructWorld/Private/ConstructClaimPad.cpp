@@ -4,6 +4,7 @@
 #include "Components/InputComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "ConstructModsSubsystem.h"
 #include "ConstructClaimNameRequest.h"
 #include "ConstructClaimsSubsystem.h"
 #include "ConstructChunkDrawing.h"
@@ -123,6 +124,7 @@ bool AConstructClaimPad::CanRelease() const
 void AConstructClaimPad::ShowSearch(const FCrowdyChunkClaimInfo* Claim)
 {
     const int64 PreviousOwner = ShownOwner;
+    bLatestSearchSucceeded = true;
     bKnown = true;
     ShownGrid = Claim ? Claim->GridId : 0;
     ShownOwner = Claim ? Claim->OwnerUserId : 0;
@@ -192,6 +194,7 @@ void AConstructClaimPad::NameReturned(UConstructClaimNameRequest* Request, const
 void AConstructClaimPad::ResetSession()
 {
     ++ActionSerial;
+    bLatestSearchSucceeded = false;
     bKnown = false;
     ShownGrid = ShownOwner = 0;
     bMine = false;
@@ -599,4 +602,10 @@ void AConstructClaimPad::HideFeedback()
     }
     FeedbackWidget.Reset();
     FeedbackViewport.Reset();
+}
+
+UConstructModPanel* AConstructClaimPad::OpenMods()
+{
+    UConstructModsSubsystem* Menus = GetWorld() ? GetWorld()->GetSubsystem<UConstructModsSubsystem>() : nullptr;
+    return Menus ? Menus->OpenForPad(*this) : nullptr;
 }
