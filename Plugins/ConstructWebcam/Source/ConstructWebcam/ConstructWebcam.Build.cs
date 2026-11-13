@@ -7,13 +7,25 @@ public class ConstructWebcam : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
+            "CKSharedTypes",
             "Core",
             "CoreUObject",
+            "CrowdyNet",
+            "CrowdyReplication",
+            "CrowdyServices",
             "Engine"
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "ImageWrapper"
+            "ConstructPresence",
+            "ConstructShell",
+            "CrowdySDK",
+            "ImageCore",
+            "ImageWrapper",
+            "Media",
+            "MediaAssets",
+            "MediaUtils",
+            "RHI"
         });
     }
 }

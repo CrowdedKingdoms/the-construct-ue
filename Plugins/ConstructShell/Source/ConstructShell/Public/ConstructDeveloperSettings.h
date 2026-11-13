@@ -16,4 +16,8 @@ public:
 	/** Makes Construct voice available in newly started runtime worlds. Microphone and listening remain player choices. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Voice", meta = (DisplayName = "Enable Voice"))
 	bool bEnableVoice = false;
+
+	/** Makes Construct webcams available in newly started runtime worlds. The camera and showing others' video remain player choices. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Webcam", meta = (DisplayName = "Enable Webcam"))
+	bool bEnableWebcam = false;
 };
