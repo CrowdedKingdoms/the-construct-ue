@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Host",
+  "Description": "The Construct's host-side plumbing and the stand-ins the UE developer builds against until the SDK's real pieces land.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [{"Name":"ConstructHost","Type":"Runtime","LoadingPhase":"Default"}],
+  "Plugins": [
+    {"Name":"CrowdySDK","Enabled":true}
+  ]
+}
