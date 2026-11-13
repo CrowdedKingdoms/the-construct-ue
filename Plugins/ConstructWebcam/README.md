@@ -1,7 +1,13 @@
 # Construct Webcam
 
-Optional webcam video over presence pawns. Capture, encoding and decoding are not built yet.
+Optional webcam video over presence pawns. Webcams are off until the project turns on **Enable Webcam** (Project Settings > Plugins > Crowdy Construct); each player then turns their own camera on, and separately chooses to see other players' cameras.
 
-For now the plugin holds the types the camera toggle and the feed widgets share (camera state, the reason a camera is blocked, a feed's texture and sender), and `UStandInC9`, a temporary stand-in: a game instance subsystem that answers the camera, feed and owner-lookup calls from eight looped JPEGs under `Content/StandIn/C9/`, with fixture selectors for every camera state, block reason, owner answer and feed expiry. The owner lookup answers Confirmed, Unknown or Failed like the real call (Unknown means ask again later): by default the first ask for an actor id answers Unknown and later asks answer Confirmed. It makes no network call and holds no real state.
+- **Camera** (`UConstructWebcamSubsystem`, a game instance subsystem): opens the first camera Windows lists through Unreal's media framework, scales each frame to 128x96, encodes it as JPEG (at most 8 KB and 10 frames a second) and sends it through the Crowdy SDK only while another player's presence pawn is within one chunk. It starts only when the player is signed in, gameplay input is allowed, the app is not paused, the player's Video Send setting allows it (players under 18 need a parent's consent) and the app's recording state is known. Its state and the reason a camera is blocked are what the UI shows; `IsBeingRecorded()` is known before the camera opens, so the recording notice comes first.
+- **Feeds** (`UConstructWebcamFeeds`, a world subsystem): with Show Video on and the player's Video Receive setting allowing it, decodes nearby players' JPEG frames into one 128x96 texture per sender, drawn over that sender's presence pawn. A feed empties after 1 s without frames. WebP and malformed frames show nothing and are counted, not logged.
+- **Settings:** both subsystems read the player's settings again on `RefreshSettings()`; the feeds also do so every 10 s while Show Video is on.
 
-The stand-in exists only so the UI can be built before the real calls exist. It is deleted, with its fixtures, when the real subsystems replace it. A packaged build does not stage the loose fixture files, so the stand-in then shows no picture.
+Capture uses the engine's WmfMedia plugin, so the camera works on Windows only. Nothing is recorded, saved or uploaded.
+
+`SetFrameSourceForCheck`, `ClearFrameSourceForCheck` and `SetDecodedFrameObserverForCheck` exist only for the end-to-end check and are compiled out of Shipping builds.
+
+`UStandInC9`, a temporary stand-in that answers the same calls from eight looped JPEGs under `Content/StandIn/C9/`, stays until the UI is switched over to the real subsystems; it is then deleted with its fixtures. A packaged build does not stage the loose fixture files, so the stand-in then shows no picture.

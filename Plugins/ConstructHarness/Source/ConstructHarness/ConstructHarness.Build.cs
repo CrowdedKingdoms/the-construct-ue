@@ -10,6 +10,7 @@ public class ConstructHarness : ModuleRules
 			"ConstructHub",
 			"ConstructPresence",
 			"ConstructShell",
+			"ConstructWebcam",
 			"ConstructWorld",
 			"Core",
 			"CoreUObject",
@@ -23,7 +24,11 @@ public class ConstructHarness : ModuleRules
 			"CrowdyNet",
 			"CrowdySDK",
 			"CrowdyVoice",
+			"ImageCore",
+			"ImageWrapper",
 			"Json",
+			"Media",
+			"MediaUtils",
 			"UMG",
 		});
 	}
