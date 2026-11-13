@@ -1,0 +1,1535 @@
+[
+  {
+    "atMs": 0,
+    "event": "OnModScriptStarted",
+    "args": {
+      "Script": {
+        "ModId": "standin-clicker",
+        "Name": "Clicker",
+        "AuthorId": 1001,
+        "Version": 1,
+        "Calls": [
+          "pointer_clicks",
+          "hud_set"
+        ]
+      }
+    }
+  },
+  {
+    "atMs": 0,
+    "call": "ShowHud",
+    "args": {
+      "Script": {
+        "ModId": "standin-clicker",
+        "Name": "Clicker",
+        "AuthorId": 1001,
+        "Version": 1,
+        "Calls": [
+          "pointer_clicks",
+          "hud_set"
+        ]
+      },
+      "Text": "Clicker: click anywhere"
+    }
+  },
+  {
+    "atMs": 0,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 1900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 2900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 3900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 4900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 5900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 6900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 7900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 8900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 9900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 10900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 11900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 12900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 13900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 14900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 15900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 16900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 17900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 18900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 19900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 20900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 21900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 22900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 23900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 24900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 25900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 26900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 27900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 28900,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29000,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29100,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29200,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29300,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29400,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29500,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29600,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29700,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29800,
+    "call": "DrainClicks",
+    "args": {}
+  },
+  {
+    "atMs": 29900,
+    "call": "DrainClicks",
+    "args": {}
+  }
+]
