@@ -20,4 +20,8 @@ public:
 	/** Makes Construct webcams available in newly started runtime worlds. The camera and showing others' video remain player choices. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Webcam", meta = (DisplayName = "Enable Webcam"))
 	bool bEnableWebcam = false;
+
+	/** Lets newly started runtime worlds enter claimed grids and offer their Mod Scripts. Running one remains the player's choice. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Mod Scripts", meta = (DisplayName = "Enable Mod Scripts"))
+	bool bEnableModScripts = false;
 };
