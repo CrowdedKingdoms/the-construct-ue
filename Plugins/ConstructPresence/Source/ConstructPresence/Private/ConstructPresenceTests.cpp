@@ -513,6 +513,8 @@ bool FConstructPresenceNameTagSanitizationTest::RunTest(const FString& Parameter
 	          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
 	          HtmlBreakName);
 
+	TestEqual(TEXT("Shared display getter uses the same first line"), Fixture.Pawn->GetPlayerDisplayName(), FString(TEXT("Visible first line")));
+
 	const FString CarriageReturnName(TEXT("Visible before CR\rhidden after CR"));
 	FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, CarriageReturnName);
 	TestEqual(TEXT("The tag stops at a carriage return"),
@@ -532,6 +534,9 @@ bool FConstructPresenceNameTagSanitizationTest::RunTest(const FString& Parameter
 	TestEqual(TEXT("The tag is capped at 64 characters"),
 	          FConstructPresenceTestAccess::Tag(*Fixture.Pawn)->Text.ToString(),
 	          FString::ChrN(64, TEXT('N')));
+    TestEqual(TEXT("Shared display getter has the same cap"), Fixture.Pawn->GetPlayerDisplayName(), FString::ChrN(64, TEXT('N')));
+    FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, FString::ChrN(63, TEXT('N')) + TEXT("<Br>hidden"));
+    TestEqual(TEXT("Break starting across the cap is still recognized"), Fixture.Pawn->GetPlayerDisplayName(), FString::ChrN(63, TEXT('N')));
 	return true;
 }
 

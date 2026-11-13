@@ -10,4 +10,4 @@ Capture uses the engine's WmfMedia plugin, so the camera works on Windows only. 
 
 `SetFrameSourceForCheck`, `ClearFrameSourceForCheck` and `SetDecodedFrameObserverForCheck` exist only for the end-to-end check and are compiled out of Shipping builds.
 
-`UStandInC9`, a temporary stand-in that answers the same calls from eight looped JPEGs under `Content/StandIn/C9/`, stays until the UI is switched over to the real subsystems; it is then deleted with its fixtures. A packaged build does not stage the loose fixture files, so the stand-in then shows no picture.
+The UI uses the real camera and feed subsystems. The temporary sample-video adapter and JPEG fixtures have been removed.

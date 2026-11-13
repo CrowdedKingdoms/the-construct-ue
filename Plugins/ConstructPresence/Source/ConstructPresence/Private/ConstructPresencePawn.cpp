@@ -1,6 +1,7 @@
 #include "ConstructPresencePawn.h"
 
 #include "ConstructPresenceSubsystem.h"
+#include "ConstructPresenceOwnerRequest.h"
 #include "ConstructPlayerNameWidget.h"
 #include "Subsystem/CrowdyAuthentication.h"
 #include "ConstructUIInputSubsystem.h"
@@ -124,12 +125,15 @@ AConstructPresencePawn::AConstructPresencePawn()
 void AConstructPresencePawn::BeginPlay()
 {
 	Super::BeginPlay();
+    bOwnerIdentityEnded = false;
 	Entity->OnCrowdyOwnershipAssigned.AddUniqueDynamic(this, &ThisClass::HandleOwnershipAssigned);
 	RefreshMovementState();
 }
 
 void AConstructPresencePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    bOwnerIdentityEnded = true;
+    ResetConfirmedOwner();
 	ShutdownPlayerNameWidget();
 	RemoveInputMappings();
 	ApplyLocalMovementState(false);
@@ -420,6 +424,7 @@ void AConstructPresencePawn::HandleGameplayInputChanged(bool bAllowed)
 
 void AConstructPresencePawn::HandleOwnershipAssigned(const FGuid& NewOwnerID, ECrowdyRole NewRole, bool bIsLocallyOwned)
 {
+    ResetConfirmedOwner();
 	RefreshMovementState();
 	NameTag->SetVisibility(!bIsLocallyOwned);
 	if (!bIsLocallyOwned)
@@ -584,23 +589,30 @@ void AConstructPresencePawn::SetDisplayedPlayerName(const FString& Name)
 	OnRep_PlayerName();
 }
 
+FString AConstructPresencePawn::GetPlayerDisplayName() const
+{
+    // Include enough lookahead to recognize an HTML break starting just before the display cap.
+    const FString Prefix = PlayerName.Left(67);
+    int32 DisplayLength = FMath::Min(Prefix.Len(), 64);
+    for (const TCHAR* BreakMarker : {TEXT("\n"), TEXT("\r"), TEXT("<br>")})
+    {
+        const int32 BreakAt = Prefix.Find(BreakMarker, ESearchCase::IgnoreCase);
+        if (BreakAt != INDEX_NONE)
+        {
+            DisplayLength = FMath::Min(DisplayLength, BreakAt);
+        }
+    }
+    return Prefix.Left(DisplayLength);
+}
+
 void AConstructPresencePawn::OnRep_PlayerName()
 {
-	int32 DisplayLength = PlayerName.Len();
-	for (const TCHAR* BreakMarker : {TEXT("\n"), TEXT("\r"), TEXT("<br>")})
-	{
-		const int32 BreakAt = PlayerName.Find(BreakMarker, ESearchCase::IgnoreCase);
-		if (BreakAt != INDEX_NONE)
-		{
-			DisplayLength = FMath::Min(DisplayLength, BreakAt);
-		}
-	}
-	const FString DisplayName = PlayerName.Left(FMath::Min(DisplayLength, 64));
-	NameTag->SetText(FText::FromString(DisplayName));
+    NameTag->SetText(FText::FromString(GetPlayerDisplayName()));
 }
 
 void AConstructPresencePawn::ResetRemoteName()
 {
+    ResetConfirmedOwner();
 	ApplyLocalMovementState(false);
 	PlayerName.Reset();
 	NameTag->SetText(FText::GetEmpty());
@@ -610,6 +622,10 @@ void AConstructPresencePawn::ResetRemoteName()
 void AConstructPresencePawn::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+    if (OwnerRequest && !OwnerRequest->MatchesCurrent(this))
+    {
+        ResetConfirmedOwner();
+    }
 	if (!NameTag->IsVisible() || PlayerName.IsEmpty())
 	{
 		return;

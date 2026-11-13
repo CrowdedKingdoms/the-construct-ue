@@ -1,6 +1,5 @@
 #include "ConstructWebcamFeeds.h"
 #include "ConstructWebcamSubsystem.h"
-#include "StandInC9.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -8,37 +7,17 @@
 #include "Engine/GameInstance.h"
 #include "Misc/AutomationTest.h"
 #include "UObject/StrongObjectPtr.h"
-#include <type_traits>
 
-// Every call the UI makes on the stand-in answers the same type on the real subsystems, so the swap is a rename.
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().GetCameraState()),
-	decltype(std::declval<UConstructWebcamSubsystem&>().GetCameraState())>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().GetBlockedReason()),
-	decltype(std::declval<UConstructWebcamSubsystem&>().GetBlockedReason())>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().GetLocalPreview()),
-	decltype(std::declval<UConstructWebcamSubsystem&>().GetLocalPreview())>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().IsBeingRecorded()),
-	decltype(std::declval<UConstructWebcamSubsystem&>().IsBeingRecorded())>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().SetCameraOn(true)),
-	decltype(std::declval<UConstructWebcamSubsystem&>().SetCameraOn(true))>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().SetShowVideo(true)),
-	decltype(std::declval<UConstructWebcamFeeds&>().SetShowVideo(true))>);
-static_assert(std::is_same_v<decltype(std::declval<UStandInC9&>().GetFeedInfo(nullptr)),
-	decltype(std::declval<UConstructWebcamFeeds&>().GetFeedInfo(nullptr))>);
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructWebcamSwapHandlersTest, "Construct.Webcam.Swap.HandlersBindToBoth",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructWebcamSwapHandlersTest, "Construct.Webcam.Swap.RealHandlersBind",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 
 bool FConstructWebcamSwapHandlersTest::RunTest(const FString& Parameters)
 {
 	TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>(GetTransientPackage(), NAME_None, RF_Transient));
-	TStrongObjectPtr<UStandInC9> StandIn(NewObject<UStandInC9>(Instance.Get()));
 	TStrongObjectPtr<UConstructWebcamSubsystem> Camera(NewObject<UConstructWebcamSubsystem>(Instance.Get()));
 	TStrongObjectPtr<UConstructWebcamFeeds> Feeds(NewObject<UConstructWebcamFeeds>(GetTransientPackage(), NAME_None, RF_Transient));
 	TStrongObjectPtr<UConstructWebcamTestListener> Listener(NewObject<UConstructWebcamTestListener>());
 
-	StandIn->OnCameraStateChanged.AddUniqueDynamic(Listener.Get(), &UConstructWebcamTestListener::OnCameraState);
-	StandIn->OnFeedChanged.AddUniqueDynamic(Listener.Get(), &UConstructWebcamTestListener::OnFeed);
 	Camera->OnCameraStateChanged.AddUniqueDynamic(Listener.Get(), &UConstructWebcamTestListener::OnCameraState);
 	Feeds->OnFeedChanged.AddUniqueDynamic(Listener.Get(), &UConstructWebcamTestListener::OnFeed);
 

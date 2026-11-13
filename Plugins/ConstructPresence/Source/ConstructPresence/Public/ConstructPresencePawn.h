@@ -4,11 +4,13 @@
 #include "GameFramework/Character.h"
 #include "Replication/Components/CrowdyEntityComponent.h"
 #include "Subsystem/CrowdyAccountTypes.h"
+#include "TimerManager.h"
 #include "ConstructPresencePawn.generated.h"
 
 class APlayerCameraManager;
 class UConstructPlayerNameWidget;
 class UCrowdyGameSession;
+class UConstructPresenceOwnerRequest;
 struct FConstructPlayerNameTestAccess;
 class UCameraComponent;
 class UConstructUIInputSubsystem;
@@ -31,12 +33,18 @@ class CONSTRUCTPRESENCE_API AConstructPresencePawn : public ACharacter
 
 public:
 	AConstructPresencePawn();
+    /** Platform-confirmed owner of this entity, or zero while an asynchronous lookup is unresolved. */
+    UFUNCTION(BlueprintCallable, Category = "Construct|Presence")
+    int64 GetConfirmedUserId();
 	/** Current replicated display name; presentation only, never an identity check. */
 	UFUNCTION(BlueprintPure, Category = "Construct|Presence")
 	FString GetPlayerName() const
 	{
 		return PlayerName;
 	}
+    /** Bounded first-line label shared by name tags and other player-facing widgets. */
+    FString GetPlayerDisplayName() const;
+
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -58,6 +66,7 @@ protected:
 	virtual void OnRep_PlayerName();
 
 private:
+    friend class UConstructPresenceOwnerRequest;
 	friend class UConstructPresenceSubsystem;
 	friend class UConstructPlayerNameWidget;
 	friend struct FConstructPlayerNameTestAccess;
@@ -100,6 +109,16 @@ private:
 	void ApplyNameLookupFailure();
 	void SetDisplayedPlayerName(const FString& Name);
 	void ResetRemoteName();
+    void ResetConfirmedOwner();
+    void RetryConfirmedOwner();
+    void HandleConfirmedOwner(UConstructPresenceOwnerRequest* Request, bool bConfirmed, int64 UserId);
+
+    UPROPERTY(Transient)
+    TObjectPtr<UConstructPresenceOwnerRequest> OwnerRequest;
+    FTimerHandle OwnerRetryTimer;
+    uint64 OwnerLookupGeneration = 0;
+    int64 ConfirmedOwnerUserId = 0;
+    bool bOwnerIdentityEnded = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "Construct|Presence")
 	TObjectPtr<UCrowdyEntityComponent> Entity;
