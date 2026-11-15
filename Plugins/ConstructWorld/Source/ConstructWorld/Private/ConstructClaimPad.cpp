@@ -58,7 +58,7 @@ AConstructClaimPad::AConstructClaimPad()
     Sign->SetRelativeLocation(FVector(0, 0, 150));
     Sign->SetRelativeRotation(FRotator(0, 180, 0));
     Sign->SetHorizontalAlignment(EHTA_Center);
-    Sign->SetWorldSize(22);
+    Sign->SetWorldSize(26);
     Sign->SetText(FText::FromString(TEXT("Claim pad\nOwnership unknown")));
 
     for (int32 Index = 0; Index < 12; ++Index)
@@ -211,16 +211,38 @@ void AConstructClaimPad::ResetSession()
 
 void AConstructClaimPad::UpdatePresentation()
 {
+    FString DisplayName;
+    for (const TCHAR Character : ShownName)
+    {
+        if (Character == TEXT('\r') || Character == TEXT('\n') || DisplayName.Len() >= 64)
+        {
+            break;
+        }
+        if (!FChar::IsControl(Character) && Character != TEXT('<') && Character != TEXT('>'))
+        {
+            DisplayName.AppendChar(Character);
+        }
+    }
+    if (!DisplayName.IsEmpty() && DisplayName[DisplayName.Len() - 1] >= 0xD800 && DisplayName[DisplayName.Len() - 1] <= 0xDBFF)
+    {
+        DisplayName.LeftChopInline(1);
+    }
     FString State = TEXT("Ownership unknown");
     if (bKnown)
     {
-        State = ShownGrid == 0 ? TEXT("Free\nE: Claim this chunk") : (bMine ? (TEXT("Your chunk\n") + ShownName + TEXT("\nE: Release")) : TEXT("Claimed by ") + ShownName);
+        State = ShownGrid == 0 ? TEXT("Free\nE: Claim this chunk") : (bMine ? (TEXT("Your chunk\n") + DisplayName + TEXT("\nE: Release")) : TEXT("Claimed by\n") + DisplayName);
     }
     if (bBusy)
     {
         State += TEXT("\nWorking...");
     }
     Sign->SetText(FText::FromString(State));
+    Sign->SetXScale(1.0f);
+    const double TextWidth = Sign->GetTextLocalSize().Y;
+    if (TextWidth > 300.0)
+    {
+        Sign->SetXScale(static_cast<float>(300.0 / TextWidth));
+    }
     const FColor Colour = bMine ? FColor(75, 220, 150) : FColor(240, 175, 75);
     Sign->SetTextRenderColor(bKnown && ShownGrid > 0 ? Colour : FColor::White);
 

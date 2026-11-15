@@ -102,6 +102,7 @@ private:
 	friend class UConstructChatPanel;
 	friend class UConstructChatLookup;
 	friend class FConstructChatSessionIsolationTest;
+	friend class FConstructChatComposerLayoutTest;
 	friend class FConstructChatHistoryTest;
 	friend class FConstructChatLifecycleTest;
 	friend class FConstructChatControllerReplacementTest;
@@ -159,7 +160,7 @@ private:
 	int32 SetupAttemptsRemaining = 0;
 	bool bRuntimeActive = false;
 	bool bComposerOpen = false;
-	bool bShowHistory = true;
+	bool bShowHistory = false;
 	bool bChannelMode = false;
 	bool bLoading = false;
 	bool bCanPublish = false;

@@ -17,6 +17,7 @@
 
 struct FConstructProgramPadTestAccess
 {
+    static void SetWidth(AConstructProgramPad& Pad, float Width) { Pad.SignWidth = Width; }
     static void SetSigns(AConstructProgramPad& Pad, ATextRenderActor* Title, ATextRenderActor* Description)
     {
         Pad.TitleSign = Title;
@@ -78,6 +79,21 @@ bool FConstructPadMatch::RunTest(const FString&)
         FString(TEXT("/Game/Construct/Maps/L_ConstructPaint")));
     TestEqual(TEXT("Catalog name is shown"), Fixture.Title->GetTextRender()->Text.ToString(), Fixture.Paint.Name);
     TestEqual(TEXT("Catalog description is shown"), Fixture.Description->GetTextRender()->Text.ToString(), Fixture.Paint.Description);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPadReadableDescription, "Construct.Holodeck.Pad.ReadableDescription", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FConstructPadReadableDescription::RunTest(const FString&)
+{
+    FPadFixture F;
+    FConstructProgramPadTestAccess::SetWidth(*F.Pad, 880);
+    F.Description->GetTextRender()->SetWorldSize(80);
+    F.Paint.Description = TEXT("A shared 3D canvas. Place and erase voxel blocks together.");
+    F.Pad->ApplyCatalog(MakeArrayView(&F.Paint, 1), true);
+    const UTextRenderComponent* Render = F.Description->GetTextRender();
+    TestTrue(TEXT("The real catalog description wraps into readable lines"), Render->Text.ToString().Contains(TEXT("\n")));
+    TestEqual(TEXT("Wrapping preserves the complete catalog description"), Render->Text.ToString().Replace(TEXT("\n"), TEXT(" ")), F.Paint.Description);
+    TestTrue(TEXT("The description fits its enlarged board without squashing letters"), Render->GetTextLocalSize().Y <= 880.01 && Render->XScale == 1.0f);
     return true;
 }
 

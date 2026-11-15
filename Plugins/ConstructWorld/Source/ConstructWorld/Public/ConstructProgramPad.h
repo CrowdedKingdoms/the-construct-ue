@@ -40,6 +40,9 @@ private:
     UPROPERTY(EditInstanceOnly, Category = "Construct Program")
     TObjectPtr<ATextRenderActor> DescriptionSign;
 
+    UPROPERTY(EditInstanceOnly, Category = "Construct Program", meta = (ClampMin = "100"))
+    float SignWidth = 390.0f;
+
     UPROPERTY(EditInstanceOnly, Category = "Construct Program")
     bool bReturnToHolodeck = false;
 

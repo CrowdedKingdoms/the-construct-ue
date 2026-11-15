@@ -4,6 +4,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "ConstructClaimNameRequest.h"
 #include "ConstructClaimsTestReceiver.h"
 #include "CrowdyServerObjectTypes.h"
@@ -379,6 +380,26 @@ bool FConstructClaimBox::RunTest(const FString&)
     FConstructClaimsTestAccess::CompleteName(*F.Pad, Claim.OwnerUserId, TEXT("Synthetic owner"));
     F.Pad->GetShownOwner(Grid, Owner, Mine, Name);
     TestEqual(TEXT("The completed name replaces the fallback"), Name, FString(TEXT("Synthetic owner")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructClaimSignBounds, "Construct.Claims.SignBounds", ClaimTestFlags)
+bool FConstructClaimSignBounds::RunTest(const FString&)
+{
+    FClaimsFixture F;
+    const FCrowdyChunkClaimInfo Claim = F.Owner(false);
+    F.Deliver(ECrowdyClaimResult::Success, &Claim);
+    const FString Name = FString::ChrN(120, TEXT('W')) + TEXT("\nRESERVED");
+    FConstructClaimsTestAccess::CompleteName(*F.Pad, Claim.OwnerUserId, Name);
+    const UTextRenderComponent* Sign = F.Pad->FindComponentByClass<UTextRenderComponent>();
+    TestNotNull(TEXT("Claim sign exists"), Sign);
+    TestTrue(TEXT("A long owner name stays inside its own pad sign"), Sign->GetTextLocalSize().Y * Sign->XScale <= 300.01);
+    TestEqual(TEXT("Owner display is bounded to one line; status has its own line"), Sign->Text.ToString(), TEXT("Claimed by\n") + FString::ChrN(64, TEXT('W')));
+    int64 Grid, Owner;
+    bool Mine;
+    FString RawName;
+    F.Pad->GetShownOwner(Grid, Owner, Mine, RawName);
+    TestEqual(TEXT("Presentation fitting never changes the owner getter"), RawName, Name);
     return true;
 }
 

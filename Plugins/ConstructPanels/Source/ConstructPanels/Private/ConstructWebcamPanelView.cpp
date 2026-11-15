@@ -1,12 +1,14 @@
 #include "ConstructWebcamPanel.h"
 
 #include "ConstructShellStyle.h"
+#include "ConstructSocialPanelLayout.h"
 #include "InputCoreTypes.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
@@ -231,15 +233,79 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
             const UConstructWebcamPanel* Panel = WeakPanel.Get();
             return Panel && Panel->IsAvailable() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed;
         })
-        + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(FMargin(24, 100, 24, 24))
+        + SOverlay::Slot()
         [
-            SNew(SBox).WidthOverride(250).MaxDesiredHeight(480)
-            [
+            ConstructSocialPanelLayout::Place(EConstructSocialPanelRegion::Webcam,
                 SNew(SBorder).BorderImage(Style.GetBrush("Construct.Panel")).Padding(12)
                 [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        SNew(STextBlock).Text(LOCTEXT("FixedCameraOn", "CAMERA ON"))
+                        .TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body"))
+                        .ColorAndOpacity(FConstructShellStyle::Gold())
+                        .Visibility_Lambda([WeakPanel]()
+                        {
+                            const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                            return Panel && Panel->IsCameraOn() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                        })
+                    ]
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
+                        .Visibility_Lambda([WeakPanel]()
+                        {
+                            const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                            return Panel && !Panel->GetRecordingText().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                        })
+                        .Text_Lambda([WeakPanel]()
+                        {
+                            const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                            return Panel ? Panel->GetRecordingText() : FText::GetEmpty();
+                        })
+                    ]
+                    + SVerticalBox::Slot().FillHeight(1)
+                    [
                     SNew(SScrollBox)
                     + SScrollBox::Slot()
                     [
+                        SNew(SExpandableArea)
+                        .InitiallyCollapsed(true)
+                        .BorderImage(Style.GetBrush("Construct.Panel"))
+                        .BodyBorderImage(Style.GetBrush("Construct.Panel"))
+                        .HeaderContent()
+                        [
+                            SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
+                                .Text_Lambda([WeakPanel]()
+                                {
+                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                    return Panel && Panel->IsCameraOn() ? LOCTEXT("ExpandCameraOn", "Webcam controls - CAMERA ON") : LOCTEXT("ExpandWebcam", "Webcam controls");
+                                })
+                            ]
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Muted")).AutoWrapText(true)
+                                .Text_Lambda([WeakPanel]()
+                                {
+                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                    return Panel ? Panel->GetReasonText() : FText::GetEmpty();
+                                })
+                            ]
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
+                                .Text_Lambda([WeakPanel]()
+                                {
+                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                    return Panel ? Panel->GetRecordingText() : FText::GetEmpty();
+                                })
+                            ]
+                        ]
+                        .BodyContent()
+                        [
                         SNew(SVerticalBox)
                         + SVerticalBox::Slot().AutoHeight()
                         [
@@ -261,7 +327,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             })
                             [
                                 SNew(STextBlock)
-                                .TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body"))
+                                .TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
                                 .Text_Lambda([WeakPanel]()
                                 {
                                     const UConstructWebcamPanel* Panel = WeakPanel.Get();
@@ -271,8 +337,8 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                         ]
                         + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)
                         [
-                            SNew(SHorizontalBox)
-                            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 6, 0)
+                            SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
                             [
                                 SNew(SButton)
                                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
@@ -288,7 +354,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                                 })
                                 [
                                     SNew(STextBlock)
-                                    .TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body"))
+                                    .TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
                                     .Text_Lambda([WeakPanel]()
                                     {
                                         const UConstructWebcamPanel* Panel = WeakPanel.Get();
@@ -296,7 +362,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                                     })
                                 ]
                             ]
-                            + SHorizontalBox::Slot().AutoWidth()
+                            + SVerticalBox::Slot().AutoHeight()
                             [
                                 SNew(SButton)
                                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
@@ -370,9 +436,10 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                                 return Panel ? Panel->GetMessage() : FText::GetEmpty();
                             })
                         ]
+                        ]
                     ]
-                ]
-            ]
+                    ]
+                ])
         ]
         + SOverlay::Slot()
         [

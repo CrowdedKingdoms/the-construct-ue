@@ -1,6 +1,7 @@
 #include "ConstructVoiceComponent.h"
 
 #include "ConstructShellStyle.h"
+#include "ConstructSocialPanelLayout.h"
 #include "ConstructUIInputSubsystem.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -14,6 +15,8 @@
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/SViewport.h"
@@ -188,13 +191,34 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 	             })
 	         .TextStyle(&Style, "Construct.Text.Muted")
 	         .AutoWrapText(true)];
-	return SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible) +
-	       SOverlay::Slot()
-	           .HAlign(HAlign_Right)
-	           .VAlign(VAlign_Top)
-	           .Padding(FMargin(24, 72, 24, 24))[SNew(SBorder)
-	                                                 .BorderImage(Style.GetBrush("Construct.Panel"))
-	                                                 .Padding(18)[SNew(SBox).WidthOverride(360)[Content]]];
+	return ConstructSocialPanelLayout::Place(EConstructSocialPanelRegion::Voice,
+	    SNew(SBorder).BorderImage(Style.GetBrush("Construct.Panel")).Padding(12)
+	    [
+	        SNew(SScrollBox)
+	        + SScrollBox::Slot()
+	        [
+	            SNew(SExpandableArea)
+	            .InitiallyCollapsed(true)
+	            .BorderImage(Style.GetBrush("Construct.Panel"))
+	            .BodyBorderImage(Style.GetBrush("Construct.Panel"))
+	            .HeaderContent()
+	            [
+	                SNew(SVerticalBox)
+	                + SVerticalBox::Slot().AutoHeight()
+	                [SNew(STextBlock).Text(LOCTEXT("ExpandVoice", "Voice controls")).TextStyle(&Style, "Construct.Text.Body").AutoWrapText(true)]
+	                + SVerticalBox::Slot().AutoHeight()
+	                [
+	                    SNew(STextBlock).TextStyle(&Style, "Construct.Text.Small").AutoWrapText(true)
+	                    .Text_Lambda([WeakThis]()
+	                    {
+	                        const UConstructVoiceComponent* Voice = WeakThis.IsValid() ? WeakThis->FindVoiceComponent() : nullptr;
+	                        return Voice ? Voice->GetStatusText() : FText::GetEmpty();
+	                    })
+	                ]
+	            ]
+	            .BodyContent()[Content]
+	        ]
+	    ]);
 }
 
 #undef LOCTEXT_NAMESPACE

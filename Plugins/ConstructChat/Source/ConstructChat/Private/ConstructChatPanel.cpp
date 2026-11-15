@@ -1,6 +1,7 @@
 #include "ConstructChatComponent.h"
 
 #include "ConstructShellStyle.h"
+#include "ConstructSocialPanelLayout.h"
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "Widgets/Input/SButton.h"
@@ -148,7 +149,7 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	                                                             })[SNew(STextBlock)
 	                                                                    .Text(LOCTEXT("Refresh", "Refresh"))
 	                                                                    .TextStyle(&Style, "Construct.Text.Small")]]];
-	Content->AddSlot().AutoHeight().Padding(0, 10)[SNew(SBox).HeightOverride(
+	Content->AddSlot().FillHeight(1).Padding(0, 10)[SNew(SBox).MaxDesiredHeight(
 	    150)[SNew(SScrollBox) + SScrollBox::Slot()[SNew(STextBlock)
 	                                                   .AutoWrapText(true)
 	                                                   .WrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping)
@@ -220,13 +221,8 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	    0, 6, 0, 0)[SNew(STextBlock)
 	                    .Text(LOCTEXT("Controls", "Enter: type / send    Esc: cancel    F3: hide chat"))
 	                    .TextStyle(&Style, "Construct.Text.Small")];
-	return SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible) +
-	       SOverlay::Slot()
-	           .HAlign(HAlign_Left)
-	           .VAlign(VAlign_Top)
-	           .Padding(FMargin(20))
-	           [SNew(SBox).WidthOverride(430)
-	               [SNew(SBorder)
+	return ConstructSocialPanelLayout::Place(EConstructSocialPanelRegion::Chat,
+	               SNew(SBorder)
 	                    .BorderImage(Style.GetBrush("Construct.Panel"))
 	                    .Padding(16)
 	                    .OnMouseButtonDown_Lambda([](const FGeometry&, const FPointerEvent& Event)
@@ -236,7 +232,7 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 			                    return FReply::Handled();
 		                    }
 		                    return FReply::Unhandled();
-	                    })[Content]]];
+	                    })[Content]);
 }
 
 #undef LOCTEXT_NAMESPACE
