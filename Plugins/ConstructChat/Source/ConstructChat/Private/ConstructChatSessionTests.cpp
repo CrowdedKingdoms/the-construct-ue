@@ -8,11 +8,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructChatSessionIsolationTest,
 bool FConstructChatSessionIsolationTest::RunTest(const FString& Parameters)
 {
 	UConstructChatComponent* Chat = NewObject<UConstructChatComponent>();
+	TestFalse(TEXT("Chat history starts hidden"), Chat->bShowHistory);
+	Chat->bShowHistory = true;
 	UConstructChatLookup* Old = NewObject<UConstructChatLookup>(Chat);
 	Old->Initialize(Chat);
 	Chat->ActiveLookup = Old;
 	Chat->History.Add(TEXT("Previous account"));
 	Chat->ResetSession();
+	TestFalse(TEXT("A new session starts with history hidden"), Chat->bShowHistory);
 	TestTrue(TEXT("Session change clears history"), Chat->History.IsEmpty());
 	UConstructChatLookup* Current = NewObject<UConstructChatLookup>(Chat);
 	Current->Initialize(Chat);

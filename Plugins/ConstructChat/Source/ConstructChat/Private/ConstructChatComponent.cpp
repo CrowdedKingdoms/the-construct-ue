@@ -657,6 +657,7 @@ void UConstructChatComponent::SendRefused(const FCrowdySendRefusal& Refusal)
 void UConstructChatComponent::ResetSession()
 {
 	CloseComposer();
+	bShowHistory = false;
 	CancelGameplayFocusRestore();
 	++SessionGeneration;
 	ActiveLookup = nullptr;

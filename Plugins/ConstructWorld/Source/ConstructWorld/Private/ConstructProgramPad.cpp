@@ -119,14 +119,35 @@ void AConstructProgramPad::ApplyCatalog(TConstArrayView<FConstructHubProgram> Pr
 
 void AConstructProgramPad::SetSign(const FText& Title, const FText& Description)
 {
-    constexpr double SignWidth = 390.0;
-    const auto SetFittedText = [](ATextRenderActor* Sign, const FText& Text)
+    const auto SetFittedText = [this](ATextRenderActor* Sign, const FText& Text, bool bWrap)
     {
         if (IsValid(Sign))
         {
             UTextRenderComponent* Render = Sign->GetTextRender();
             Render->SetXScale(1.0f);
             Render->SetText(Text);
+            if (bWrap && Render->GetTextLocalSize().Y > SignWidth)
+            {
+                TArray<FString> Words;
+                Text.ToString().ParseIntoArrayWS(Words);
+                FString Wrapped;
+                FString Line;
+                for (const FString& Word : Words)
+                {
+                    const FString Candidate = Line.IsEmpty() ? Word : Line + TEXT(" ") + Word;
+                    Render->SetText(FText::FromString(Candidate));
+                    if (!Line.IsEmpty() && Render->GetTextLocalSize().Y > SignWidth)
+                    {
+                        Wrapped += Line + TEXT("\n");
+                        Line = Word;
+                    }
+                    else
+                    {
+                        Line = Candidate;
+                    }
+                }
+                Render->SetText(FText::FromString(Wrapped + Line));
+            }
             const double Width = Render->GetTextLocalSize().Y;
             if (Width > SignWidth)
             {
@@ -134,8 +155,8 @@ void AConstructProgramPad::SetSign(const FText& Title, const FText& Description)
             }
         }
     };
-    SetFittedText(TitleSign, Title);
-    SetFittedText(DescriptionSign, Description);
+    SetFittedText(TitleSign, Title, false);
+    SetFittedText(DescriptionSign, Description, true);
 }
 
 void AConstructProgramPad::EnterPad(UPrimitiveComponent*, AActor* OtherActor, UPrimitiveComponent*, int32, bool, const FHitResult&)

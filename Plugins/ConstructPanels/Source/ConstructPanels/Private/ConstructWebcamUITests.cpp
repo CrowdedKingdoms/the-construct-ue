@@ -23,6 +23,14 @@
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/SOverlay.h"
+#include "Slate/WidgetRenderer.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "RenderingThread.h"
 #include "Widgets/SViewport.h"
 
 struct FConstructWebcamUITestAccess
@@ -501,4 +509,85 @@ bool FConstructWebcamUIAppliedOffTest::RunTest(const FString&)
     return true;
 }
 
+namespace
+{
+TSharedPtr<SExpandableArea> FindCommunicationExpander(const TSharedRef<SWidget>& Widget)
+{
+    if (Widget->GetType() == FName(TEXT("SExpandableArea")))
+    {
+        return StaticCastSharedRef<SExpandableArea>(Widget);
+    }
+    FChildren* Children = Widget->GetChildren();
+    for (int32 Index = 0; Children && Index < Children->Num(); ++Index)
+    {
+        if (TSharedPtr<SExpandableArea> Found = FindCommunicationExpander(Children->GetChildAt(Index)))
+        {
+            return Found;
+        }
+    }
+    return nullptr;
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructCommunicationCardsRender, "Construct.Webcam.UI.CommunicationCardsRendered", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::NonNullRHI)
+bool FConstructCommunicationCardsRender::RunTest(const FString&)
+{
+    FWebcamUIFixture F;
+    if (!TestTrue(TEXT("Presentation sources initialized without a camera or SDK session"), F.Initialize()))
+    {
+        return false;
+    }
+    UClass* VoiceClass = LoadClass<UUserWidget>(nullptr, TEXT("/Script/ConstructVoice.ConstructVoicePanel"));
+    UClass* ChatClass = LoadClass<UUserWidget>(nullptr, TEXT("/Script/ConstructChat.ConstructChatPanel"));
+    if (!TestNotNull(TEXT("Real optional Voice widget class"), VoiceClass) || !TestNotNull(TEXT("Real optional Chat widget class"), ChatClass))
+    {
+        return false;
+    }
+    const TStrongObjectPtr<UUserWidget> Voice(CreateWidget<UUserWidget>(F.Controller, VoiceClass));
+    const TStrongObjectPtr<UUserWidget> Chat(CreateWidget<UUserWidget>(F.Controller, ChatClass));
+    const TSharedRef<SWidget> VoiceSlate = Voice->TakeWidget();
+    const TSharedRef<SWidget> ChatSlate = Chat->TakeWidget();
+    const TSharedPtr<SExpandableArea> VoiceArea = FindCommunicationExpander(VoiceSlate);
+    const TSharedPtr<SExpandableArea> CameraArea = FindCommunicationExpander(F.Slate.ToSharedRef());
+    if (!TestTrue(TEXT("Each optional panel has its own expander"), VoiceArea.IsValid() && CameraArea.IsValid()))
+    {
+        return false;
+    }
+    TestFalse(TEXT("Voice starts collapsed"), VoiceArea->IsExpanded());
+    TestFalse(TEXT("Webcam starts collapsed"), CameraArea->IsExpanded());
+    Chat->SetVisibility(ESlateVisibility::Collapsed);
+    const TSharedRef<SWidget> Root = SNew(SOverlay)
+        + SOverlay::Slot()[ChatSlate]
+        + SOverlay::Slot()[VoiceSlate]
+        + SOverlay::Slot()[F.Slate.ToSharedRef()];
+    FWidgetRenderer Renderer(true);
+    const FString Directory = FPaths::ProjectSavedDir() / TEXT("UILayout/Rendered");
+    IFileManager::Get().MakeDirectory(*Directory, true);
+    const auto Render = [&](const TCHAR* Name, FVector2D Size)
+    {
+        // Two layout passes allow wrapped text to use its allotted width.
+        TStrongObjectPtr<UTextureRenderTarget2D> Warmup(Renderer.DrawWidget(Root, Size));
+        FlushRenderingCommands();
+        TStrongObjectPtr<UTextureRenderTarget2D> Target(Renderer.DrawWidget(Root, Size));
+        FlushRenderingCommands();
+        TArray<FColor> Pixels;
+        if (!Target.IsValid() || !Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels))
+        {
+            AddError(TEXT("The actual communication widgets could not be rendered"));
+            return;
+        }
+        TArray64<uint8> Png;
+        FImageUtils::PNGCompressImageArray(Target->SizeX, Target->SizeY, Pixels, Png);
+        TestTrue(TEXT("Rendered UI image saved"), FFileHelper::SaveArrayToFile(Png, *(Directory / Name)));
+    };
+    Render(TEXT("Arrival-1920.png"), FVector2D(1920, 1080));
+    VoiceArea->SetExpanded(true);
+    TestFalse(TEXT("Opening voice does not open webcam"), CameraArea->IsExpanded());
+    CameraArea->SetExpanded(true);
+    TestTrue(TEXT("Opening webcam preserves open voice"), VoiceArea->IsExpanded());
+    Chat->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    Render(TEXT("AllOpen-1920.png"), FVector2D(1920, 1080));
+    Render(TEXT("AllOpen-1280.png"), FVector2D(1280, 720));
+    return true;
+}
 #endif
