@@ -24,4 +24,8 @@ public:
 	/** Lets newly started runtime worlds enter claimed grids and offer their Mod Scripts. Running one remains the player's choice. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Mod Scripts", meta = (DisplayName = "Enable Mod Scripts"))
 	bool bEnableModScripts = false;
+
+	/** Offers the in-game Studio dock in newly started runtime worlds. Starting the agent remains the player's choice. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Studio dock", meta = (DisplayName = "Enable Studio Dock"))
+	bool bEnableStudioDock = true;
 };
