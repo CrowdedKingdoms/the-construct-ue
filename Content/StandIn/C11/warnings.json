@@ -1,0 +1,12 @@
+[
+  { "atMs": 1000, "event": "OnStateChanged", "args": { "State": "Ready" } },
+  { "atMs": 2000, "event": "OnWarning", "args": { "Text": "Stand-in warning: the model is slow to answer." } },
+  { "atMs": 3000, "event": "OnFocusChanged", "args": { "bHasFocus": true } },
+  { "atMs": 6000, "event": "OnFocusChanged", "args": { "bHasFocus": false } },
+  { "atMs": 8000, "event": "OnFocusChanged", "args": { "bHasFocus": true } },
+  { "atMs": 9000, "event": "OnWarning", "args": { "Text": "Stand-in warning: a request was refused as not offered in Unreal." } },
+  { "atMs": 12000, "event": "OnCloseRequested", "args": {} },
+  { "waitFor": "Close", "branches": { "Any": [
+    { "atMs": 0, "event": "OnWarning", "args": { "Text": "Stand-in: this warning belongs to the closed boot, so the dock drops it." } }
+  ] } }
+]

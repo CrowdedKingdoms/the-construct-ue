@@ -1,0 +1,8 @@
+[
+  { "atMs": 800, "event": "OnStateChanged", "args": { "State": "NeedsConsent", "Text": "Stand-in notice. The Studio agent sends your mod project's source, your messages, the screenshots it takes, and the names and positions of other players near you to the model provider. You pay for it, and every request is charged. The agent's sessions stay on this computer, where another account on this Windows profile can read them." } },
+  { "waitFor": "GiveProviderConsent", "branches": { "Any": [
+    { "atMs": 1500, "event": "OnStateChanged", "args": { "State": "Ready" } },
+    { "atMs": 1500, "event": "studio.projectOpen", "args": { "ProjectId": "501", "ProjectName": "Stand-in Greeter", "Revision": "rev-1", "bReachesVisitors": false } },
+    { "atMs": 1500, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 0, "TodayCharge": "0.00", "DayLimit": "5.00" } } }
+  ] } }
+]

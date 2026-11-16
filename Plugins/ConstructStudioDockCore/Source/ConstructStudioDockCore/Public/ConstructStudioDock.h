@@ -1,0 +1,188 @@
+#pragma once
+
+#include "Components/Widget.h"
+#include "Containers/Ticker.h"
+#include "ConstructStudioDockHost.h"
+#include "ConstructStudioDockTypes.h"
+#include "ConstructStudioDock.generated.h"
+
+class SConstructStudioDockPlaceholder;
+class UConstructStudioCaptureRequest;
+
+/**
+ * The Studio dock: the platform's agent beside the game view, in the slot the panel gives it. This build has no agent
+ * page yet, so a boot ends in Failed with NotBuiltYet; the refusals, generations, prompt and close rules all hold.
+ */
+UCLASS(meta=(DisplayName="Studio Dock"))
+class CONSTRUCTSTUDIODOCKCORE_API UConstructStudioDock : public UWidget
+{
+	GENERATED_BODY()
+
+public:
+	/** Seconds an unanswered deploy prompt waits before it declines itself. */
+	static constexpr double PromptSeconds = 60.0;
+
+	/** Seconds a boot may stay in Booting before it fails. */
+	static constexpr double BootSeconds = 60.0;
+
+	/** Boots the dock on a grid and returns None, or refuses at once with the reason and the state unchanged. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	EConstructStudioDockReason Open(int64 GridId, const FText& GridLabel, const FString& ProjectId = TEXT(""));
+
+	/** Returns the dock to Closed from any state, withdrawing a pending prompt. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void Close();
+
+	/** Moves the dock to the grid the player now stands in; a different grid withdraws a pending prompt. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void SetGrid(int64 GridId, const FText& GridLabel);
+
+	UFUNCTION(BlueprintPure, Category="Construct|Studio Dock")
+	EConstructStudioDockState GetState() const;
+
+	/** The reason the last state change gave; Failed keeps its reason until Close. */
+	UFUNCTION(BlueprintPure, Category="Construct|Studio Dock")
+	EConstructStudioDockReason GetReason() const;
+
+	/** The text to show for GetReason, including the agent's own message when it failed with one. */
+	UFUNCTION(BlueprintPure, Category="Construct|Studio Dock")
+	FText GetReasonText() const;
+
+	UFUNCTION(BlueprintPure, Category="Construct|Studio Dock")
+	static FText DescribeReason(EConstructStudioDockReason Why);
+
+	/** The platform's provider notice to show in NeedsConsent; empty until the platform supplies it. */
+	UFUNCTION(BlueprintPure, Category="Construct|Studio Dock")
+	FText GetConsentNotice() const;
+
+	/** Records the player's consent in NeedsConsent; the boot carries on. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void GiveProviderConsent();
+
+	/** Answers the pending prompt; Run is refused, and the prompt withdrawn, when its grid, project or revision changed. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void AnswerDeployPrompt(int64 PromptId, bool bRun);
+
+	/** Opens the platform's wallet page in the player's own browser. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void OpenWallet();
+
+	/** Sends the player's own screenshot of the game view to the agent. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void ShareScreenshot();
+
+	/** The host that answers CaptureView, held weakly; set it before Open. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	void SetHost(TScriptInterface<IConstructStudioDockHost> Host);
+
+	/** Answers a CaptureView call from Blueprint. */
+	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
+	static void FinishCapture(const FOnConstructStudioCaptured& OnDone, const FConstructStudioCapture& Capture);
+
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioDockStateChanged OnStateChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioDeployPrompt OnDeployPrompt;
+
+	/** The prompt was withdrawn or declined itself; close it. */
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioDeployPromptWithdrawn OnDeployPromptWithdrawn;
+
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioUsageChanged OnUsageChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioWarning OnWarning;
+
+	/** The dock's keyboard focus changed. */
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioFocusChanged OnFocusChanged;
+
+	/** Escape was pressed inside the dock; the game decides whether to close it. */
+	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
+	FOnConstructStudioCloseRequested OnCloseRequested;
+
+	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+	virtual void BeginDestroy() override;
+#if WITH_EDITOR
+	virtual const FText GetPaletteCategory() override;
+#endif
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+
+private:
+	friend class UConstructStudioCaptureRequest;
+	friend struct FConstructStudioDockTestAccess;
+	// The stand-in replays recorded agent traffic through Outbound and the Receive functions; nothing else reaches them.
+	friend class UStandInC11;
+
+	/** What the dock tells the agent's page and the platform: a message name and a short detail. */
+	static TMulticastDelegate<void(UConstructStudioDock&, FName, const FString&)> Outbound;
+	static TWeakObjectPtr<UConstructStudioDock> OpenDock;
+	static int64 LastPromptId;
+
+	void ClaimBoot();
+	void ReceiveBootOutcome(int64 InGeneration, EConstructStudioDockState NewState, EConstructStudioDockReason NewReason, const FText& Text);
+	void ReceiveProject(int64 InGeneration, const FString& InProjectId, const FString& Name, const FString& InRevision, bool bInReachesVisitors);
+	void ReceiveFileChanged(int64 InGeneration, const FString& Path, const FString& InRevision);
+	void ReceiveDeployRequest(int64 InGeneration, EConstructStudioDeployKind Kind);
+	void ReceiveRunAnswer(int64 InGeneration, bool bOk);
+	void ReceiveScreenshotRequest(int64 InGeneration, const FString& Label);
+	void ReceiveUsage(int64 InGeneration, const FConstructStudioUsage& Usage);
+	void ReceiveWarning(int64 InGeneration, const FText& Text);
+	void ReceiveFocus(int64 InGeneration, bool bInHasFocus);
+	void ReceiveCloseRequest(int64 InGeneration);
+	void CaptureAnswered(UConstructStudioCaptureRequest& Request, const FConstructStudioCapture& Capture);
+
+	bool IsCurrent(int64 InGeneration) const;
+	bool Advance(float DeltaSeconds);
+	void SetState(EConstructStudioDockState NewState, EConstructStudioDockReason NewReason, const FText& Text = FText::GetEmpty());
+	void Fail(EConstructStudioDockReason Why, const FText& Text);
+	void CloseFor(EConstructStudioDockReason Why);
+	void Teardown();
+	void WithdrawPrompt(const TCHAR* Answer);
+	void RefuseCaptures(const TCHAR* Why);
+	void RequestCapture(const FString& Label, bool bShared);
+	void Send(FName Message, const FString& Detail = FString());
+	int64 SignedInUser(bool& bOutAccessEnded) const;
+	void WorldCleanup(UWorld* CleanedWorld, bool bSessionEnded, bool bCleanupResources);
+	void SlateWidgetGone();
+	bool PlaceholderHasFocus() const;
+	void ClearPlaceholderFocus();
+	FText PlaceholderText() const;
+
+	EConstructStudioDockState State = EConstructStudioDockState::Closed;
+	EConstructStudioDockReason Reason = EConstructStudioDockReason::None;
+	FText ReasonText;
+	FText ConsentNotice;
+	int64 Generation = 0;
+	int64 BootUser = 0;
+	int64 CurrentGridId = 0;
+	FText CurrentGridLabel;
+	FString CurrentProjectId;
+	FString CurrentProjectName;
+	FString CurrentRevision;
+	bool bCurrentReachesVisitors = false;
+	bool bProjectRead = false;
+	TArray<FString> ChangedFiles;
+	FConstructStudioDeployPrompt Pending;
+	double PromptAge = 0.0;
+	double BootAge = 0.0;
+	bool bRunInFlight = false;
+	bool bBootReplayed = false;
+	bool bFocusReported = false;
+	TOptional<int64> UserForTests;
+	bool bAccessEndedForTests = false;
+	TOptional<bool> PlaceholderFocusForTests;
+	TWeakObjectPtr<UObject> HostObject;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UConstructStudioCaptureRequest>> PendingCaptures;
+
+	FTSTicker::FDelegateHandle Ticker;
+	FDelegateHandle WorldCleanupHandle;
+	// Weak, as UWidget holds MyWidget: the slot the panel gives the dock owns its Slate widget.
+	TWeakPtr<SConstructStudioDockPlaceholder> Placeholder;
+};

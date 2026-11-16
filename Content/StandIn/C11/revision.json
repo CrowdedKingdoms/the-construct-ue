@@ -1,0 +1,11 @@
+[
+  { "atMs": 1000, "event": "OnStateChanged", "args": { "State": "Ready" } },
+  { "atMs": 1000, "event": "studio.projectOpen", "args": { "ProjectId": "503", "ProjectName": "Stand-in Revision Demo", "Revision": "rev-1", "bReachesVisitors": false } },
+  { "atMs": 3000, "event": "studio.draftTest", "args": {} },
+  { "atMs": 5000, "event": "fileChanged", "args": { "Path": "server/src/logic.rs", "Revision": "rev-2" } },
+  { "atMs": 6000, "event": "studio.draftTest", "args": {} },
+  { "waitFor": "AnswerDeployPrompt", "branches": {
+    "Run": [ { "atMs": 3000, "event": "RunProjectAnswered", "args": { "bOk": true } } ],
+    "NotNow": []
+  } }
+]

@@ -1,0 +1,15 @@
+[
+  { "atMs": 1000, "event": "OnStateChanged", "args": { "State": "Ready" } },
+  { "atMs": 1000, "event": "studio.projectOpen", "args": { "ProjectId": "501", "ProjectName": "Stand-in Greeter", "Revision": "rev-1", "bReachesVisitors": false } },
+  { "atMs": 1000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 0, "TodayCharge": "0.00", "DayLimit": "5.00" } } },
+  { "atMs": 31000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 2, "TodayCharge": "0.04", "DayLimit": "5.00" } } },
+  { "atMs": 61000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 5, "TodayCharge": "0.10", "DayLimit": "5.00" } } },
+  { "atMs": 91000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 9, "TodayCharge": "0.18", "DayLimit": "5.00" } } },
+  { "atMs": 121000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 12, "TodayCharge": "0.24", "DayLimit": "5.00" } } },
+  { "atMs": 151000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 12, "TodayCharge": "0.24", "DayLimit": "5.00" } } },
+  { "atMs": 181000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 16, "TodayCharge": "0.32", "DayLimit": "5.00" } } },
+  { "atMs": 211000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 21, "TodayCharge": "0.42", "DayLimit": "5.00" } } },
+  { "atMs": 241000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 25, "TodayCharge": "0.50", "DayLimit": "5.00" } } },
+  { "atMs": 271000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 30, "TodayCharge": "0.60", "DayLimit": "5.00" } } },
+  { "atMs": 301000, "event": "OnUsageChanged", "args": { "Usage": { "Payer": "player", "TodayRequests": 34, "TodayCharge": "0.68", "DayLimit": "5.00" } } }
+]
