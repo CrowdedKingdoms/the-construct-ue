@@ -1,6 +1,8 @@
 #include "ConstructVoiceComponent.h"
 
 #include "ConstructShellStyle.h"
+#include "SConstructExpandableArea.h"
+#include "Widgets/Layout/SBox.h"
 #include "ConstructSocialPanelLayout.h"
 #include "ConstructUIInputSubsystem.h"
 #include "Engine/GameViewportClient.h"
@@ -14,7 +16,6 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Layout/SBorder.h"
-#include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
@@ -104,6 +105,8 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 	                      .AutoWrapText(true)];
 	Content->AddSlot().AutoHeight().Padding(
 	    0, 0, 0, 16)[SNew(SCheckBox)
+                         .Style(&Style, "Construct.CheckBox")
+                         .CheckBoxImageVAlign(VAlign_Center)
 	                     .IsChecked_Lambda(
 	                         [WeakThis]()
 	                         {
@@ -122,11 +125,13 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 			                         Voice->SetPushToTalkEnabled(State == ECheckBoxState::Checked);
 			                         WeakThis->RequestGameplayFocusRestore();
 		                         }
-	                         })[SNew(STextBlock)
+	                         })[SNew(SBox).MinDesiredHeight(28).VAlign(VAlign_Center)[SNew(STextBlock)
 	                                .Text(LOCTEXT("PTT", "Enable push-to-talk"))
-	                                .TextStyle(&Style, "Construct.Text.Heading")]];
+	                                .TextStyle(&Style, "Construct.Text.Heading")]]];
 	Content->AddSlot().AutoHeight().Padding(
 	    0, 0, 0, 20)[SNew(SCheckBox)
+                         .Style(&Style, "Construct.CheckBox")
+                         .CheckBoxImageVAlign(VAlign_Center)
 	                     .IsChecked_Lambda(
 	                         [WeakThis]()
 	                         {
@@ -144,11 +149,12 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 			                         Voice->SetListeningEnabled(State == ECheckBoxState::Checked);
 			                         WeakThis->RequestGameplayFocusRestore();
 		                         }
-	                         })[SNew(STextBlock)
+	                         })[SNew(SBox).MinDesiredHeight(28).VAlign(VAlign_Center)[SNew(STextBlock)
 	                                .Text(LOCTEXT("Listen", "Hear incoming voice"))
-	                                .TextStyle(&Style, "Construct.Text.Heading")]];
+	                                .TextStyle(&Style, "Construct.Text.Heading")]]];
 	Content->AddSlot().AutoHeight().Padding(
 	    0, 0, 0, 18)[SNew(SButton)
+	                     .HAlign(HAlign_Center).VAlign(VAlign_Center)
 	                     .ButtonStyle(&Style, "Construct.Button.Secondary")
 	                     .ContentPadding(FMargin(18, 10))
 	                     .OnClicked_Lambda(
@@ -197,7 +203,7 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 	        SNew(SScrollBox)
 	        + SScrollBox::Slot()
 	        [
-	            SNew(SExpandableArea)
+	            SNew(SConstructExpandableArea)
 	            .InitiallyCollapsed(true)
 	            .BorderImage(Style.GetBrush("Construct.Panel"))
 	            .BodyBorderImage(Style.GetBrush("Construct.Panel"))
@@ -205,10 +211,15 @@ TSharedRef<SWidget> UConstructVoicePanel::RebuildWidget()
 	            [
 	                SNew(SVerticalBox)
 	                + SVerticalBox::Slot().AutoHeight()
-	                [SNew(STextBlock).Text(LOCTEXT("ExpandVoice", "Voice controls")).TextStyle(&Style, "Construct.Text.Body").AutoWrapText(true)]
+	                [SNew(SBox).MinDesiredHeight(SConstructExpandableArea::HeaderRowHeight).VAlign(VAlign_Center)[SNew(STextBlock).Text(LOCTEXT("ExpandVoice", "Voice controls")).TextStyle(&Style, "Construct.Text.Body").AutoWrapText(true)]]
 	                + SVerticalBox::Slot().AutoHeight()
 	                [
 	                    SNew(STextBlock).TextStyle(&Style, "Construct.Text.Small").AutoWrapText(true)
+                        .Visibility_Lambda([WeakThis]()
+                        {
+                            const UConstructVoiceComponent* Voice = WeakThis.IsValid() ? WeakThis->FindVoiceComponent() : nullptr;
+                            return Voice && !Voice->GetStatusText().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                        })
 	                    .Text_Lambda([WeakThis]()
 	                    {
 	                        const UConstructVoiceComponent* Voice = WeakThis.IsValid() ? WeakThis->FindVoiceComponent() : nullptr;

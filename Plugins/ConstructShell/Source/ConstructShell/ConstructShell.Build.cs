@@ -12,10 +12,11 @@ public class ConstructShell : ModuleRules
             "CrowdyServices",
             "DeveloperSettings",
             "Engine",
+            "Slate",
             "SlateCore",
             "UMG"
         });
-        PrivateDependencyModuleNames.AddRange(new[] { "Slate", "SlateCore", "Projects", "EnhancedInput", "InputCore", "CrowdySDK", "CrowdyNet", "CrowdyReplication" });
+        PrivateDependencyModuleNames.AddRange(new[] { "SlateCore", "Projects", "EnhancedInput", "InputCore", "CrowdySDK", "CrowdyNet", "CrowdyReplication" });
         RuntimeDependencies.Add("$(PluginDir)/Resources/Icons/*.svg", StagedFileType.UFS);
     }
 }

@@ -5,6 +5,13 @@
 #include "ConstructWebcamSafetyRequest.h"
 #include "ConstructPresencePawn.h"
 #include "ConstructUIInputSubsystem.h"
+#include "ConstructShellStyle.h"
+#include "SConstructExpandableArea.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/SBoxPanel.h"
 #include "ConstructWebcamSubsystem.h"
 #include "ConstructWebcamFeeds.h"
 #include "Components/InputComponent.h"
@@ -31,6 +38,8 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "RenderingThread.h"
+#include "Rendering/SlateRenderer.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Widgets/SViewport.h"
 
 struct FConstructWebcamUITestAccess
@@ -513,7 +522,7 @@ namespace
 {
 TSharedPtr<SExpandableArea> FindCommunicationExpander(const TSharedRef<SWidget>& Widget)
 {
-    if (Widget->GetType() == FName(TEXT("SExpandableArea")))
+    if ((Widget->GetType() == FName(TEXT("SExpandableArea")) || Widget->GetType() == FName(TEXT("SConstructExpandableArea"))))
     {
         return StaticCastSharedRef<SExpandableArea>(Widget);
     }
@@ -526,6 +535,105 @@ TSharedPtr<SExpandableArea> FindCommunicationExpander(const TSharedRef<SWidget>&
         }
     }
     return nullptr;
+}
+}
+
+namespace
+{
+void FlushControlVectorResources()
+{
+    // WidgetRenderer batches 3D widgets without the main renderer's vector-atlas update.
+    FSlateRenderer& Renderer = *FSlateApplication::Get().GetRenderer();
+    {
+        FSlateRenderer::FScopedAcquireDrawBuffer Buffer(Renderer);
+        Renderer.DrawWindows(Buffer.GetDrawBuffer());
+    }
+    FlushRenderingCommands();
+}
+
+void VisitVisibleControls(const TSharedRef<SWidget>& Widget, TFunctionRef<void(const TSharedRef<SWidget>&)> Visit)
+{
+    if (!Widget->GetVisibility().IsVisible())
+    {
+        return;
+    }
+    Visit(Widget);
+    FChildren* Children = Widget->GetChildren();
+    for (int32 Index = 0; Children && Index < Children->Num(); ++Index)
+    {
+        VisitVisibleControls(Children->GetChildAt(Index), Visit);
+    }
+}
+
+TSharedPtr<SWidget> FirstControlOfType(const TSharedRef<SWidget>& Root, FName Type)
+{
+    TSharedPtr<SWidget> Result;
+    VisitVisibleControls(Root, [&Result, Type](const TSharedRef<SWidget>& Widget)
+    {
+        if (!Result.IsValid() && Widget->GetType() == Type)
+        {
+            Result = Widget;
+        }
+    });
+    return Result;
+}
+
+void CheckSocialControlAlignment(FAutomationTestBase& Test, const TSharedRef<SWidget>& Root, bool bExpanded)
+{
+    int32 Buttons = 0;
+    bool bCameraButtonChecked = false;
+    int32 Checks = 0;
+    int32 Headers = 0;
+    VisitVisibleControls(Root, [&](const TSharedRef<SWidget>& Widget)
+    {
+        if (Widget->GetType() == FName(TEXT("SConstructExpandableArea")))
+        {
+            const TSharedPtr<SWidget> Icon = FirstControlOfType(Widget, TEXT("SImage"));
+            const TSharedPtr<SWidget> Label = FirstControlOfType(Widget, TEXT("STextBlock"));
+            if (Icon && Label)
+            {
+                const FSlateRect A = Icon->GetCachedGeometry().GetLayoutBoundingRect();
+                const FSlateRect B = Label->GetCachedGeometry().GetLayoutBoundingRect();
+                Test.TestTrue(TEXT("Expander indicator aligns with title row"), FMath::Abs((A.Top + A.Bottom) - (B.Top + B.Bottom)) <= 2.0f);
+                ++Headers;
+            }
+        }
+        if (Widget->GetType() == FName(TEXT("SCheckBox")))
+        {
+            const TSharedPtr<SWidget> Icon = FirstControlOfType(Widget, TEXT("SImage"));
+            const TSharedPtr<SWidget> Label = FirstControlOfType(Widget, TEXT("STextBlock"));
+            if (Icon && Label)
+            {
+                const FSlateRect A = Icon->GetCachedGeometry().GetLayoutBoundingRect();
+                const FSlateRect B = Label->GetCachedGeometry().GetLayoutBoundingRect();
+                Test.TestTrue(TEXT("Checkbox indicator aligns with label centre"), FMath::Abs((A.Top + A.Bottom) - (B.Top + B.Bottom)) <= 2.0f);
+                Test.TestTrue(TEXT("Checkbox label has an eight-pixel gap"), B.Left - A.Right >= 7.9f);
+                ++Checks;
+            }
+        }
+        if (Widget->GetType() == FName(TEXT("SButton")))
+        {
+            const TSharedPtr<SWidget> Child = FirstControlOfType(Widget, TEXT("STextBlock"));
+            const TSharedPtr<STextBlock> Label = Child ? StaticCastSharedPtr<STextBlock>(Child) : nullptr;
+            const FString Caption = Label ? Label->GetText().ToString() : FString();
+            if (Caption == TEXT("Camera off  [C]") || Caption == TEXT("Show Video off [F6]") || Caption == TEXT("Settings") || Caption == TEXT("Stop microphone now") || Caption == TEXT("Use channel chat") || Caption == TEXT("Refresh"))
+            {
+                const FSlateRect A = Widget->GetCachedGeometry().GetLayoutBoundingRect();
+                const FSlateRect B = Label->GetCachedGeometry().GetLayoutBoundingRect();
+                Test.TestTrue(TEXT("Button label centres vertically"), FMath::Abs((A.Top + A.Bottom) - (B.Top + B.Bottom)) <= 2.0f);
+                Test.TestTrue(TEXT("Button label centres horizontally"), FMath::Abs((A.Left + A.Right) - (B.Left + B.Right)) <= 2.0f);
+                bCameraButtonChecked |= Caption == TEXT("Camera off  [C]");
+                ++Buttons;
+            }
+        }
+    });
+    Test.TestEqual(TEXT("Both panel header indicators checked"), Headers, 2);
+    if (bExpanded)
+    {
+        Test.TestTrue(TEXT("Real camera button alignment checked"), bCameraButtonChecked);
+        Test.TestEqual(TEXT("Both real voice checkboxes checked"), Checks, 2);
+        Test.TestTrue(TEXT("Real voice and webcam button labels checked"), Buttons >= 4);
+    }
 }
 }
 
@@ -568,10 +676,14 @@ bool FConstructCommunicationCardsRender::RunTest(const FString&)
         // Two layout passes allow wrapped text to use its allotted width.
         TStrongObjectPtr<UTextureRenderTarget2D> Warmup(Renderer.DrawWidget(Root, Size));
         FlushRenderingCommands();
+        FlushControlVectorResources();
         TStrongObjectPtr<UTextureRenderTarget2D> Target(Renderer.DrawWidget(Root, Size));
         FlushRenderingCommands();
+        CheckSocialControlAlignment(*this, Root, VoiceArea->IsExpanded() && CameraArea->IsExpanded());
         TArray<FColor> Pixels;
-        if (!Target.IsValid() || !Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels))
+        FReadSurfaceDataFlags ReadFlags(RCM_UNorm);
+        ReadFlags.SetLinearToGamma(false);
+        if (!Target.IsValid() || !Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels, ReadFlags))
         {
             AddError(TEXT("The actual communication widgets could not be rendered"));
             return;
@@ -579,6 +691,17 @@ bool FConstructCommunicationCardsRender::RunTest(const FString&)
         TArray64<uint8> Png;
         FImageUtils::PNGCompressImageArray(Target->SizeX, Target->SizeY, Pixels, Png);
         TestTrue(TEXT("Rendered UI image saved"), FFileHelper::SaveArrayToFile(Png, *(Directory / Name)));
+        if (Size.X == 1920 && VoiceArea->IsExpanded() && CameraArea->IsExpanded())
+        {
+            const FIntRect Region(1500, 60, 1920, 840);
+            TArray<FColor> Controls;
+            if (TestTrue(TEXT("Actual voice/webcam close-up read from framebuffer"), Target->GameThread_GetRenderTargetResource()->ReadPixels(Controls, ReadFlags, Region)))
+            {
+                TArray64<uint8> CloseUp;
+                FImageUtils::PNGCompressImageArray(Region.Width(), Region.Height(), Controls, CloseUp);
+                TestTrue(TEXT("Control close-up saved"), FFileHelper::SaveArrayToFile(CloseUp, *(Directory / TEXT("Voice-Webcam-Controls.png"))));
+            }
+        }
     };
     Render(TEXT("Arrival-1920.png"), FVector2D(1920, 1080));
     VoiceArea->SetExpanded(true);
@@ -588,6 +711,52 @@ bool FConstructCommunicationCardsRender::RunTest(const FString&)
     Chat->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     Render(TEXT("AllOpen-1920.png"), FVector2D(1920, 1080));
     Render(TEXT("AllOpen-1280.png"), FVector2D(1280, 720));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructExpandableTitleAlignment, "Construct.Webcam.UI.ExpansionTitleWithStatus", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::NonNullRHI)
+bool FConstructExpandableTitleAlignment::RunTest(const FString&)
+{
+    const ISlateStyle& Style = FConstructShellStyle::Get();
+    TSharedPtr<STextBlock> Title;
+    TSharedPtr<STextBlock> Status;
+    const TSharedRef<SConstructExpandableArea> Area = SNew(SConstructExpandableArea)
+        .HeaderContent()
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(SBox).MinDesiredHeight(SConstructExpandableArea::HeaderRowHeight).VAlign(VAlign_Center)
+                [
+                    SAssignNew(Title, STextBlock).Text(FText::FromString(TEXT("Webcam controls"))).TextStyle(&Style, "Construct.Text.Body")
+                ]
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SAssignNew(Status, STextBlock).Text(FText::FromString(TEXT("A long status explanation wraps below the title while the expansion indicator stays alongside the title."))).TextStyle(&Style, "Construct.Text.Body").WrapTextAt(200)
+            ]
+        ]
+        .BodyContent()[SNew(SBox).HeightOverride(40)];
+    FWidgetRenderer Renderer(true);
+    for (bool bExpanded : {false, true})
+    {
+        Area->SetExpanded(bExpanded);
+        TStrongObjectPtr<UTextureRenderTarget2D> Warmup(Renderer.DrawWidget(Area, FVector2D(280, 220)));
+        FlushRenderingCommands();
+        FlushControlVectorResources();
+        TStrongObjectPtr<UTextureRenderTarget2D> Target(Renderer.DrawWidget(Area, FVector2D(280, 220)));
+        FlushRenderingCommands();
+        const TSharedPtr<SWidget> Indicator = FirstControlOfType(Area, TEXT("SImage"));
+        if (!TestTrue(TEXT("Real disclosure image and title exist"), Indicator.IsValid() && Title.IsValid()))
+        {
+            return false;
+        }
+        const FSlateRect Icon = Indicator->GetCachedGeometry().GetLayoutBoundingRect();
+        const FSlateRect Label = Title->GetCachedGeometry().GetLayoutBoundingRect();
+        TestTrue(TEXT("Status wraps to more than one title row"), Status->GetCachedGeometry().GetLocalSize().Y > Label.GetSize().Y);
+        TestTrue(TEXT("Long status does not lower indicator below title"), FMath::Abs((Icon.Top + Icon.Bottom) - (Label.Top + Label.Bottom)) <= 2.0f);
+        TestTrue(TEXT("Disclosure leaves a readable gap before text"), Label.Left - Icon.Right >= 7.9f);
+    }
     return true;
 }
 #endif

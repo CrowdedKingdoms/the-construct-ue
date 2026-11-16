@@ -2,6 +2,9 @@
 
 #include "Brushes/SlateColorBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
+#include "Brushes/SlateImageBrush.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 
 namespace
@@ -16,6 +19,17 @@ TUniquePtr<FSlateStyleSet> MakeStyle()
 	Style->Set("Construct.Panel", new FSlateRoundedBoxBrush(Hex(0x101111), 8.0f, Hex(0x2B2B2D), 1.0f));
 	Style->Set("Construct.Background", new FSlateColorBrush(Hex(0x09090A)));
 	Style->Set("Construct.Line", new FSlateColorBrush(Hex(0x2B2B2D)));
+    FExpandableAreaStyle Expandable = FCoreStyle::Get().GetWidgetStyle<FExpandableAreaStyle>("ExpandableArea");
+    if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("ConstructShell")))
+    {
+        const FString Icons = FPaths::Combine(Plugin->GetBaseDir(), TEXT("Resources/Icons"));
+        Expandable.SetCollapsedImage(FSlateVectorImageBrush(Icons / TEXT("chevron-right.svg"), FVector2D(16, 16)));
+        Expandable.SetExpandedImage(FSlateVectorImageBrush(Icons / TEXT("chevron-down.svg"), FVector2D(16, 16)));
+    }
+    Style->Set("Construct.Expandable", Expandable);
+    FCheckBoxStyle CheckBox = FCoreStyle::Get().GetWidgetStyle<FCheckBoxStyle>("Checkbox");
+    CheckBox.SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
+    Style->Set("Construct.CheckBox", CheckBox);
 	FButtonStyle Primary;
 	Primary.SetNormal(FSlateRoundedBoxBrush(FConstructShellStyle::Gold(), 6.0f))
 	    .SetHovered(FSlateRoundedBoxBrush(Hex(0xE8BE40), 6.0f))
