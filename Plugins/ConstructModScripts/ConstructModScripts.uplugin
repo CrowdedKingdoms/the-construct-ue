@@ -1,0 +1,35 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Mod Scripts",
+  "Description": "Local script HUD, consent, running-list, pointer input and overlay presentation.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "ConstructModScripts",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "ConstructPresence",
+      "Enabled": true
+    },
+    {
+      "Name": "ConstructShell",
+      "Enabled": true
+    },
+    {
+      "Name": "ConstructWorld",
+      "Enabled": true
+    },
+    {
+      "Name": "CrowdySDK",
+      "Enabled": true
+    }
+  ]
+}
