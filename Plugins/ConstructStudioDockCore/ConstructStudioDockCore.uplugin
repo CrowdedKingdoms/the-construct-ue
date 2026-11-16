@@ -1,0 +1,25 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Studio Dock Core",
+  "Description": "The Studio dock widget, its host interface and types, and the stand-in that replays recorded dock timelines.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "SupportedTargetPlatforms": ["Win64"],
+  "Modules": [
+    {
+      "Name": "ConstructStudioDockCore",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": ["Win64"]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "CrowdySDK",
+      "Enabled": true
+    }
+  ]
+}
