@@ -1,13 +1,14 @@
 #include "ConstructWebcamPanel.h"
 
 #include "ConstructShellStyle.h"
+#include "SConstructExpandableArea.h"
+#include "Widgets/Layout/SBox.h"
 #include "ConstructSocialPanelLayout.h"
 #include "InputCoreTypes.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
-#include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
@@ -44,6 +45,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
             Choices->AddSlot().FillWidth(1.0f).Padding(0, 0, Index < 2 ? 6 : 0, 0)
             [
                 SNew(SButton)
+                .HAlign(HAlign_Center).VAlign(VAlign_Center)
                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
                 .ContentPadding(FMargin(8, 6))
                 .IsEnabled_Lambda([CanAct, WeakPanel]()
@@ -99,6 +101,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
         + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 20)
         [
             SNew(SButton)
+            .HAlign(HAlign_Center).VAlign(VAlign_Center)
             .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
             .ContentPadding(FMargin(10, 7))
             .IsEnabled_Lambda(CanAct)
@@ -135,6 +138,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
         + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
         [
             SNew(SButton)
+            .HAlign(HAlign_Center).VAlign(VAlign_Center)
             .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
             .ContentPadding(FMargin(10, 7))
             .IsEnabled_Lambda(CanAct)
@@ -180,6 +184,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
         ReportContent->AddSlot().AutoHeight().Padding(0, 0, 0, 4)
         [
             SNew(SButton)
+            .HAlign(HAlign_Center).VAlign(VAlign_Center)
             .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
             .ContentPadding(FMargin(10, 5))
             .IsEnabled_Lambda(CanAct)
@@ -208,6 +213,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
     ReportContent->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
     [
         SNew(SButton)
+        .HAlign(HAlign_Center).VAlign(VAlign_Center)
         .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Primary"))
         .ContentPadding(FMargin(10, 7))
         .IsEnabled_Lambda(CanAct)
@@ -269,7 +275,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                     SNew(SScrollBox)
                     + SScrollBox::Slot()
                     [
-                        SNew(SExpandableArea)
+                        SNew(SConstructExpandableArea)
                         .InitiallyCollapsed(true)
                         .BorderImage(Style.GetBrush("Construct.Panel"))
                         .BodyBorderImage(Style.GetBrush("Construct.Panel"))
@@ -278,16 +284,24 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             SNew(SVerticalBox)
                             + SVerticalBox::Slot().AutoHeight()
                             [
-                                SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
-                                .Text_Lambda([WeakPanel]()
-                                {
-                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
-                                    return Panel && Panel->IsCameraOn() ? LOCTEXT("ExpandCameraOn", "Webcam controls - CAMERA ON") : LOCTEXT("ExpandWebcam", "Webcam controls");
-                                })
+                                SNew(SBox).MinDesiredHeight(SConstructExpandableArea::HeaderRowHeight).VAlign(VAlign_Center)
+                                [
+                                    SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
+                                    .Text_Lambda([WeakPanel]()
+                                    {
+                                        const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                        return Panel && Panel->IsCameraOn() ? LOCTEXT("ExpandCameraOn", "Webcam controls - CAMERA ON") : LOCTEXT("ExpandWebcam", "Webcam controls");
+                                    })
+                                ]
                             ]
                             + SVerticalBox::Slot().AutoHeight()
                             [
                                 SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Muted")).AutoWrapText(true)
+                                .Visibility_Lambda([WeakPanel]()
+                                {
+                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                    return Panel && !Panel->GetReasonText().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                                })
                                 .Text_Lambda([WeakPanel]()
                                 {
                                     const UConstructWebcamPanel* Panel = WeakPanel.Get();
@@ -297,6 +311,11 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             + SVerticalBox::Slot().AutoHeight()
                             [
                                 SNew(STextBlock).TextStyle(&Style.GetWidgetStyle<FTextBlockStyle>("Construct.Text.Body")).AutoWrapText(true)
+                                .Visibility_Lambda([WeakPanel]()
+                                {
+                                    const UConstructWebcamPanel* Panel = WeakPanel.Get();
+                                    return Panel && !Panel->GetRecordingText().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                                })
                                 .Text_Lambda([WeakPanel]()
                                 {
                                     const UConstructWebcamPanel* Panel = WeakPanel.Get();
@@ -314,6 +333,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                         + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
                         [
                             SNew(SButton)
+                            .HAlign(HAlign_Center).VAlign(VAlign_Center)
                             .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
                             .ContentPadding(FMargin(8, 6))
                             .IsEnabled_Lambda(CanAct)
@@ -341,6 +361,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
                             [
                                 SNew(SButton)
+                                .HAlign(HAlign_Center).VAlign(VAlign_Center)
                                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
                                 .ContentPadding(FMargin(6, 6))
                                 .IsEnabled_Lambda(CanAct)
@@ -365,6 +386,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             + SVerticalBox::Slot().AutoHeight()
                             [
                                 SNew(SButton)
+                                .HAlign(HAlign_Center).VAlign(VAlign_Center)
                                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
                                 .ContentPadding(FMargin(8, 6))
                                 .IsEnabled_Lambda(CanAct)
@@ -498,6 +520,7 @@ TSharedRef<SWidget> UConstructWebcamPanel::RebuildWidget()
                             + SVerticalBox::Slot().AutoHeight()
                             [
                                 SNew(SButton)
+                                .HAlign(HAlign_Center).VAlign(VAlign_Center)
                                 .ButtonStyle(&Style.GetWidgetStyle<FButtonStyle>("Construct.Button.Secondary"))
                                 .ContentPadding(FMargin(10, 7))
                                 .OnClicked_Lambda(Close)

@@ -94,6 +94,7 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	    .AutoHeight()[SNew(SHorizontalBox) +
 	                  SHorizontalBox::Slot().AutoWidth().Padding(
 	                      0, 0, 8, 0)[SNew(SButton)
+	                                      .HAlign(HAlign_Center).VAlign(VAlign_Center)
 	                                      .ButtonStyle(&Style, "Construct.Button.Secondary")
 	                                      .ContentPadding(FMargin(10, 6))
 	                                      .OnClicked_Lambda(
@@ -125,6 +126,7 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	                                                     })
 	                                                 .TextStyle(&Style, "Construct.Text.Small")]] +
 	                  SHorizontalBox::Slot().AutoWidth()[SNew(SButton)
+	                                                         .HAlign(HAlign_Center).VAlign(VAlign_Center)
 	                                                         .ButtonStyle(&Style, "Construct.Button.Secondary")
 	                                                         .ContentPadding(FMargin(10, 6))
 	                                                         .IsEnabled_Lambda(
@@ -199,6 +201,7 @@ TSharedRef<SWidget> UConstructChatPanel::RebuildWidget()
 	                                                 })] +
 	     SHorizontalBox::Slot().AutoWidth().Padding(8, 0, 0, 0)
 	         [SNew(SButton)
+	              .HAlign(HAlign_Center).VAlign(VAlign_Center)
 	              .ButtonStyle(&Style, "Construct.Button.Primary")
 	              .ContentPadding(FMargin(10, 6))
 	              .IsEnabled_Lambda(
