@@ -19,6 +19,12 @@ public:
 
 	TWeakObjectPtr<UConstructStudioDock> Dock;
 	int64 Generation = 0;
+
+	/** The agent's studio.screenshot request this answers; empty for the player's share and a run's screenshot. */
+	FString RequestId;
 	bool bShared = false;
+
+	/** The screenshot a draft test or deploy answer carries once its CLIENT half runs. */
+	bool bForRun = false;
 	bool bAnswered = false;
 };

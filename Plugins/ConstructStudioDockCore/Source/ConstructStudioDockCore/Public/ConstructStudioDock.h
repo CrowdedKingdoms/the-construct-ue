@@ -4,6 +4,7 @@
 #include "Containers/Ticker.h"
 #include "ConstructStudioDockHost.h"
 #include "ConstructStudioDockTypes.h"
+#include "ConstructStudioObservation.h"
 #include "ConstructStudioDock.generated.h"
 
 class FConstructStudioDockChannel;
@@ -12,16 +13,23 @@ class SConstructStudioDockPlaceholder;
 class SWebBrowser;
 class UConstructStudioCaptureRequest;
 class UConstructStudioDockBridge;
+class UConstructStudioScriptWatch;
 class UCrowdyStudioAgent;
 enum class EConstructStudioDockRefusal : uint8;
+enum class ECrowdyModScriptStop : uint8;
 enum class ECrowdyStudioResult : uint8;
 struct FConstructStudioDockPlatform;
+struct FCrowdyClaimSearch;
+struct FCrowdyModList;
+struct FCrowdyModProjectStatus;
 struct FCrowdyModRun;
+struct FCrowdyModScriptStatusList;
 struct FCrowdyStudioAgentBoot;
 struct FCrowdyStudioConsent;
 struct FCrowdyStudioLiveModding;
 struct FCrowdyStudioModelUsage;
 struct FCrowdyStudioProject;
+struct FCrowdyStudioProjectInfo;
 struct FWebNavigationRequest;
 
 /**
@@ -45,6 +53,18 @@ public:
 
 	/** Seconds after the agent's last saved file before the dock reads the project back. */
 	static constexpr double SaveQuietSeconds = 1.5;
+
+	/** Seconds the agent waits for a draft test or deploy answer; a run that takes longer finishes, and its answer is not sent. */
+	static constexpr double RequestWaitSeconds = 240.0;
+
+	/** Seconds a run's answer waits for its deployed CLIENT half to start in this game before reporting it not started. */
+	static constexpr double ClientStartSeconds = 20.0;
+
+	/** The most agent requests answered later that the dock holds at once. */
+	static constexpr int32 MaxHeldRequests = 32;
+
+	/** Seconds game.observe reuses its last claim lookup while the player stays in that chunk and the dock on that grid. */
+	static constexpr double ClaimReuseSeconds = 5.0;
 
 	/** Boots the dock on a grid and returns None, or refuses at once with the reason and the state unchanged. */
 	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
@@ -124,6 +144,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Construct|Studio Dock")
 	FOnConstructStudioCloseRequested OnCloseRequested;
 
+#if !UE_BUILD_SHIPPING
+	/** Queues Text as the player's next prompt to the agent; false, and nothing sent, unless the dock is Ready. For unattended checks. */
+	bool SendPrompt(const FString& Text);
+
+	/** Whether a draft test or deploy the player approved is being authorized, run or answered now. For unattended checks. */
+	bool IsRunInFlightForChecks() const;
+#endif
+
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
 	virtual void BeginDestroy() override;
 #if WITH_EDITOR
@@ -136,6 +164,7 @@ protected:
 private:
 	friend class UConstructStudioCaptureRequest;
 	friend class UConstructStudioDockBridge;
+	friend class UConstructStudioScriptWatch;
 	friend struct FConstructStudioDockTestAccess;
 	// The stand-in replays recorded agent traffic through Outbound and the Receive functions; nothing else reaches them.
 	friend class UStandInC11;
@@ -149,9 +178,10 @@ private:
 	void ReceiveBootOutcome(int64 InGeneration, EConstructStudioDockState NewState, EConstructStudioDockReason NewReason, const FText& Text);
 	void ReceiveProject(int64 InGeneration, const FString& InProjectId, const FString& Name, const FString& InRevision, bool bInReachesVisitors);
 	void ReceiveFileChanged(int64 InGeneration, const FString& Path, const FString& InRevision);
-	void ReceiveDeployRequest(int64 InGeneration, EConstructStudioDeployKind Kind);
+	/** A deploy request; RequestId is the agent's, answered with the run's result, or empty when nothing waits for one. */
+	void ReceiveDeployRequest(int64 InGeneration, EConstructStudioDeployKind Kind, const FString& RequestId = FString());
 	void ReceiveRunAnswer(int64 InGeneration, bool bOk);
-	void ReceiveScreenshotRequest(int64 InGeneration, const FString& Label);
+	void ReceiveScreenshotRequest(int64 InGeneration, const FString& Label, const FString& RequestId = FString());
 	void ReceiveUsage(int64 InGeneration, const FConstructStudioUsage& Usage);
 	void ReceiveWarning(int64 InGeneration, const FText& Text);
 	void ReceiveFocus(int64 InGeneration, bool bInHasFocus);
@@ -166,7 +196,8 @@ private:
 	void Teardown();
 	void WithdrawPrompt(const TCHAR* Answer);
 	void RefuseCaptures(const TCHAR* Why);
-	void RequestCapture(const FString& Label, bool bShared);
+	void RequestCapture(const FString& Label, bool bShared, const FString& RequestId = FString(), bool bForRun = false);
+	void RaisePrompt(EConstructStudioDeployKind Kind);
 	void Send(FName Message, const FString& Detail = FString());
 	int64 SignedInUser(bool& bOutAccessEnded) const;
 	void WorldCleanup(UWorld* CleanedWorld, bool bSessionEnded, bool bCleanupResources);
@@ -214,7 +245,66 @@ private:
 
 	/** Answers a request; false, and nothing sent, when InGeneration is not the current boot or the page has not joined. */
 	bool ReplyToAgent(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result);
-	bool RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why);
+	bool RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why, const FString& Message = FString());
+
+	/** Holds a request answered later; false, with nothing held, for an id already held or past MaxHeldRequests. */
+	bool HoldRequest(int64 InGeneration, const FString& Id);
+
+	/** Answers a held request once; false, and nothing sent, when it is not held or InGeneration is not the current boot. */
+	bool AnswerRequest(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result);
+	bool FailRequest(int64 InGeneration, const FString& Id, const FString& Message);
+	void RefuseHeldRequests(const TCHAR* Message);
+
+	/** Forgets every held request and the deploy in progress, for a boot whose page is gone. */
+	void ResetRequests();
+
+	void ContinueDeploy(ECrowdyStudioResult Result, const FString& Message);
+
+	/** Before the prompt shows: refuses a deploy that would replace a mod on the grid this project did not deploy. */
+	void CheckReplacedMod();
+	void FinishReplacedCheck(const FString& ModName);
+	void ReceiveGridMods(int64 InGeneration, const FString& RequestId, int64 GridId, const FString& ModName, const FCrowdyModList& List);
+
+	void FailDeploy(const FString& Message);
+	void AnswerDeploy(const TSharedRef<FJsonObject>& Result);
+	void ForgetDeploy();
+	void ReceiveServerMod(int64 InGeneration, const FString& RequestId, const FString& ModId, const FString& Module, const FCrowdyModList& List);
+
+	/** Goes on with a finished run's BuildReply: waits for its CLIENT half when one was deployed, else answers it. */
+	void ContinueBuild();
+
+	/** Settles BuildReply's summary and answers the deploy request with it. */
+	void AnswerBuild();
+	void WaitForClient();
+	bool IsAwaitedScript(const FString& ModId, const FString& Digest) const;
+	bool IsAwaitedClientRunning() const;
+	void ClientStarted();
+	void ClientFailed(const FString& Message);
+	void ClientWaitEnded();
+	void ReceiveScriptStarted(int64 InGeneration, const FString& ModId, const FString& Digest);
+	void ReceiveScriptStopped(int64 InGeneration, const FString& ModId, const FString& Digest, ECrowdyModScriptStop Why);
+	void ReceiveClientStatus(int64 InGeneration, const FString& RequestId, const FString& ModId, const FCrowdyModScriptStatusList& List);
+	void CaptureForRun();
+	void FinishRunCapture(const FConstructStudioCapture& Capture);
+	void DropRunCapture();
+	void DropScriptWatch();
+
+	void AnswerRuntimeStatus(int64 InGeneration, const FString& Id);
+	void AnswerRuntimeLogs(int64 InGeneration, const FString& Id, int32 Limit);
+	void AnswerClientLogs(int64 InGeneration, const FString& Id, int32 Limit);
+	void ReadClientLog(int64 InGeneration, const FString& Id, int32 Limit, const FString& ModId);
+	void AnswerProjectList(int64 InGeneration, const FString& Id);
+	void OpenProject(int64 InGeneration, const FString& Id, const FString& ProjectId);
+	void CreateProject(int64 InGeneration, const FString& Id, const FString& Name, const FString& Template);
+	void ProjectOpened(int64 InGeneration, const FString& Id, const FCrowdyStudioProjectInfo& Info);
+
+	/** Looks up the claim at the player's chunk, then answers grid.context, or game.observe when bObserve. */
+	void LookUpGrid(int64 InGeneration, const FString& Id, bool bObserve);
+	void ReceiveGridClaim(int64 InGeneration, const FString& Id, bool bObserve, const FCrowdyClaimSearch& Search);
+	void KeepObservedClaims(int64 InGeneration, const FInt64Vector& Chunk, int64 GridId, const FCrowdyClaimSearch& Search);
+	void AnswerObservation(int64 InGeneration, const FString& Id, const TOptional<FConstructStudioObservedGrid>& Grid);
+	TOptional<FInt64Vector> PlayerChunk() const;
+	TSharedPtr<FJsonObject> Observe(const TOptional<FConstructStudioObservedGrid>& Grid) const;
 
 	/** Sends a page event other than page.hello and page.token; a screenshot travels as bytesBase64, which the page turns into bytes. */
 	bool TellAgent(int64 InGeneration, const FString& Event, const TSharedRef<FJsonObject>& Payload);
@@ -289,4 +379,42 @@ private:
 	TOptional<FString> MainFrameUrlForTests;
 	TOptional<FString> TokenForTests;
 	TFunction<void(const FString&)> ScriptsForTests;
+
+	/** The agent's requests answered later, by id; each is answered once. */
+	TArray<FString> HeldRequests;
+
+	/** The agent's draft test or deploy request in progress, from its arrival until it is answered or the agent stops waiting. */
+	FString DeployRequestId;
+	double DeployRequestAge = 0.0;
+	EConstructStudioDeployKind DeployKind = EConstructStudioDeployKind::DraftTest;
+
+	/** The project is being read fresh for a deploy request before its prompt shows. */
+	bool bDeployReading = false;
+
+	/** The grid's mods are being read for a deploy request before its prompt shows. */
+	bool bDeployChecking = false;
+
+	/** A finished run's answer, held while its SERVER mod is read and its deployed CLIENT half starts here and is captured. */
+	TSharedPtr<FJsonObject> BuildReply;
+	FString AwaitedClientModId;
+	FString AwaitedClientDigest;
+	int64 AwaitedClientGridId = 0;
+	double ClientWaitAge = 0.0;
+	bool bServerModReading = false;
+	bool bAwaitingClient = false;
+	bool bClientStatusReading = false;
+	bool bRunCapturing = false;
+	int32 CaptureCount = 0;
+
+	/** game.observe's last claim lookup, for the chunk and grid it was made on, and its age. */
+	TSharedPtr<const FCrowdyClaimSearch> ObservedClaims;
+	FInt64Vector ObservedClaimChunk = FInt64Vector(0, 0, 0);
+	int64 ObservedClaimGridId = 0;
+	double ObservedClaimAge = 0.0;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UConstructStudioScriptWatch> ScriptWatch;
+
+	TOptional<FInt64Vector> ChunkForTests;
+	TFunction<TSharedPtr<FJsonObject>(const TOptional<FConstructStudioObservedGrid>&)> ObserveForTests;
 };
