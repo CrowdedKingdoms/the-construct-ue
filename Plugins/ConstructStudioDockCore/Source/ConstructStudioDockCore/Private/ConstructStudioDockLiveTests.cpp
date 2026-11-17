@@ -321,10 +321,22 @@ bool FConstructStudioDockLiveFailuresTest::RunTest(const FString& Parameters)
 		FAccess::UsePlatform(*F.Dock, Fake.Calls);
 		F.Open();
 		FCrowdyStudioAgentBoot Refused = MakeBoot(true, ECrowdyStudioResult::Refused);
-		Refused.Message = TEXT("The app allows the Studio agent no model, so it cannot start.");
+		Refused.Message = TEXT("The API address is not https, so the agent was not started.");
 		Answer(Fake.Boots, Refused);
 		TestEqual(TEXT("a refused boot read fails Unavailable"), ConstructStudioDockName(F.Dock->GetReason()), FString(TEXT("Unavailable")));
 		TestEqual(TEXT("and shows the SDK's reason"), F.Dock->GetReasonText().ToString(), Refused.Message);
+	}
+	{
+		FFakePlatform Fake;
+		FRig F;
+		FAccess::UsePlatform(*F.Dock, Fake.Calls);
+		F.Open();
+		FCrowdyStudioAgentBoot NoModel = MakeBoot(false, ECrowdyStudioResult::NoModel);
+		NoModel.Message = TEXT("No agent model is available for this app yet, so the Studio agent cannot start.");
+		Answer(Fake.Boots, NoModel);
+		TestEqual(TEXT("the SDK's NoModel fails with NoModel"), ConstructStudioDockName(F.Dock->GetReason()), FString(TEXT("NoModel")));
+		TestEqual(TEXT("and shows the SDK's reason"), F.Dock->GetReasonText().ToString(), NoModel.Message);
+		TestEqual(TEXT("and asks for no consent"), Fake.Count(TEXT("Consent")), 0);
 	}
 	{
 		FFakePlatform Fake;

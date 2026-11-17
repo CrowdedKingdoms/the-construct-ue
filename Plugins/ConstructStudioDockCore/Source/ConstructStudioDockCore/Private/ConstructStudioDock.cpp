@@ -1063,14 +1063,10 @@ void UConstructStudioDock::ReceiveAgentBoot(int64 InGeneration, const FCrowdyStu
 		return;
 	}
 	// A refusal's message names its cause (no model, no permission, the agent turned off), which a player cannot fix by retrying.
-	if (Boot.Result != ECrowdyStudioResult::Success)
+	if (Boot.Result != ECrowdyStudioResult::Success || Boot.Models.IsEmpty())
 	{
-		Fail(EConstructStudioDockReason::Unavailable, FText::FromString(Boot.Message.Left(200)));
-		return;
-	}
-	if (Boot.Models.IsEmpty())
-	{
-		Fail(EConstructStudioDockReason::NoModel, FText::GetEmpty());
+		const bool bNoModel = Boot.Result == ECrowdyStudioResult::NoModel || Boot.Result == ECrowdyStudioResult::Success;
+		Fail(bNoModel ? EConstructStudioDockReason::NoModel : EConstructStudioDockReason::Unavailable, FText::FromString(Boot.Message.Left(200)));
 		return;
 	}
 	AgentBoot = MakeShared<FCrowdyStudioAgentBoot>(Boot);
