@@ -5,10 +5,10 @@
 
 namespace
 {
-constexpr auto Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+constexpr auto PresentationTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptHudTest, "Construct.ModScripts.Presentation.HudBoundsAndPlainText", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptHudTest, "Construct.ModScripts.Presentation.HudBoundsAndPlainText", PresentationTestFlags)
 bool FConstructScriptHudTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -23,7 +23,7 @@ bool FConstructScriptHudTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptGenerationTest, "Construct.ModScripts.Presentation.StoppedRunsCannotResurrect", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptGenerationTest, "Construct.ModScripts.Presentation.StoppedRunsCannotResurrect", PresentationTestFlags)
 bool FConstructScriptGenerationTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -40,7 +40,7 @@ bool FConstructScriptGenerationTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptRequestTest, "Construct.ModScripts.Presentation.RequestsWaitForSource", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptRequestTest, "Construct.ModScripts.Presentation.RequestsWaitForSource", PresentationTestFlags)
 bool FConstructScriptRequestTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -59,7 +59,7 @@ bool FConstructScriptRequestTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptConsentTest, "Construct.ModScripts.Presentation.ConsentOrderingAndWithdrawal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptConsentTest, "Construct.ModScripts.Presentation.ConsentOrderingAndWithdrawal", PresentationTestFlags)
 bool FConstructScriptConsentTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -86,7 +86,7 @@ bool FConstructScriptConsentTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptAuthorTest, "Construct.ModScripts.Presentation.AuthorIdentityAndPendingGroup", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptAuthorTest, "Construct.ModScripts.Presentation.AuthorIdentityAndPendingGroup", PresentationTestFlags)
 bool FConstructScriptAuthorTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -104,7 +104,7 @@ bool FConstructScriptAuthorTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptUnrelatedErrorTest, "Construct.ModScripts.Presentation.UnrelatedErrorCannotResubmitConsent", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptUnrelatedErrorTest, "Construct.ModScripts.Presentation.UnrelatedErrorCannotResubmitConsent", PresentationTestFlags)
 bool FConstructScriptUnrelatedErrorTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
@@ -122,7 +122,7 @@ bool FConstructScriptUnrelatedErrorTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptLimitsTest, "Construct.ModScripts.Presentation.BoundedRowsAndReset", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptLimitsTest, "Construct.ModScripts.Presentation.BoundedRowsAndReset", PresentationTestFlags)
 bool FConstructScriptLimitsTest::RunTest(const FString&)
 {
     FConstructModScriptPresentation View;
