@@ -29,7 +29,7 @@
 
 namespace
 {
-constexpr auto Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+constexpr auto PanelTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 
 bool ContainsText(const TSharedRef<SWidget>& Widget, const FString& Caption)
 {
@@ -149,7 +149,7 @@ struct FScriptPanelFixture
 };
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptModalTest, "Construct.ModScripts.UI.ModalOwnershipAndWithdrawal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptModalTest, "Construct.ModScripts.UI.ModalOwnershipAndWithdrawal", PanelTestFlags)
 bool FConstructScriptModalTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
@@ -175,7 +175,7 @@ bool FConstructScriptModalTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptShutdownTest, "Construct.ModScripts.UI.ShutdownReleasesOnlyOwnedInput", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptShutdownTest, "Construct.ModScripts.UI.ShutdownReleasesOnlyOwnedInput", PanelTestFlags)
 bool FConstructScriptShutdownTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
@@ -195,7 +195,7 @@ bool FConstructScriptShutdownTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptBindingTest, "Construct.ModScripts.UI.ControllerBindings", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptBindingTest, "Construct.ModScripts.UI.ControllerBindings", PanelTestFlags)
 bool FConstructScriptBindingTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
@@ -226,7 +226,7 @@ bool FConstructScriptBindingTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptPreviewTest, "Construct.ModScripts.UI.PreviewImages", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptPreviewTest, "Construct.ModScripts.UI.PreviewImages", PanelTestFlags)
 bool FConstructScriptPreviewTest::RunTest(const FString&)
 {
     if (GUsingNullRHI)
@@ -288,7 +288,7 @@ bool FConstructScriptPreviewTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptActionTest, "Construct.ModScripts.UI.ButtonRequestsAndRebinding", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructScriptActionTest, "Construct.ModScripts.UI.ButtonRequestsAndRebinding", PanelTestFlags)
 bool FConstructScriptActionTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
@@ -335,7 +335,7 @@ bool FConstructScriptActionTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructChoiceListTest, "Construct.ModScripts.UI.ChoiceCardsAreDataDriven", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructChoiceListTest, "Construct.ModScripts.UI.ChoiceCardsAreDataDriven", PanelTestFlags)
 bool FConstructChoiceListTest::RunTest(const FString&)
 {
     int32 Requests = 0;
@@ -362,7 +362,7 @@ bool FConstructChoiceListTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructHudDialogTest, "Construct.ModScripts.UI.HudUpdatesPreserveControlsAndOverflow", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructHudDialogTest, "Construct.ModScripts.UI.HudUpdatesPreserveControlsAndOverflow", PanelTestFlags)
 bool FConstructHudDialogTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
@@ -403,7 +403,7 @@ bool FConstructHudDialogTest::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructConsentQueueTest, "Construct.ModScripts.UI.ConsentWaitsForExistingModal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructConsentQueueTest, "Construct.ModScripts.UI.ConsentWaitsForExistingModal", PanelTestFlags)
 bool FConstructConsentQueueTest::RunTest(const FString&)
 {
     FScriptPanelFixture Fixture;
