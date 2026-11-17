@@ -14,7 +14,14 @@ class UConstructStudioCaptureRequest;
 class UConstructStudioDockBridge;
 class UCrowdyStudioAgent;
 enum class EConstructStudioDockRefusal : uint8;
+enum class ECrowdyStudioResult : uint8;
+struct FConstructStudioDockPlatform;
+struct FCrowdyModRun;
 struct FCrowdyStudioAgentBoot;
+struct FCrowdyStudioConsent;
+struct FCrowdyStudioLiveModding;
+struct FCrowdyStudioModelUsage;
+struct FCrowdyStudioProject;
 struct FWebNavigationRequest;
 
 /**
@@ -32,6 +39,12 @@ public:
 
 	/** Seconds a boot may stay in Booting before it fails. */
 	static constexpr double BootSeconds = 60.0;
+
+	/** Seconds between reads of the player's model usage while the dock is Ready. */
+	static constexpr double UsageSeconds = 30.0;
+
+	/** Seconds after the agent's last saved file before the dock reads the project back. */
+	static constexpr double SaveQuietSeconds = 1.5;
 
 	/** Boots the dock on a grid and returns None, or refuses at once with the reason and the state unchanged. */
 	UFUNCTION(BlueprintCallable, Category="Construct|Studio Dock")
@@ -162,10 +175,29 @@ private:
 	void ClearPlaceholderFocus();
 	FText PlaceholderText() const;
 
+	bool CloseIfPlayerChanged();
 	bool StartLiveBoot();
+	TSharedPtr<FConstructStudioDockPlatform> LivePlatform();
 	UCrowdyStudioAgent* LiveAgent() const;
 	void UnbindAgent();
 	void ReceiveAgentBoot(int64 InGeneration, const FCrowdyStudioAgentBoot& Boot);
+	void ReceiveConsent(int64 InGeneration, const FCrowdyStudioConsent& Consent);
+	void ReadProject();
+	void ReceiveStudioProject(int64 InGeneration, ECrowdyStudioResult Result, const FString& Message, const FCrowdyStudioProject& Project);
+	void ShowPage();
+	void StartRun(const FConstructStudioDeployPrompt& Approved, const FString& ServerModule, const FString& ClientModule);
+	void ReceiveLiveModding(int64 InGeneration, const FConstructStudioDeployPrompt& Approved, const FString& ServerModule, const FString& ClientModule, const FCrowdyStudioLiveModding& Verdict);
+	void ReceiveModRun(int64 InGeneration, const FCrowdyModRun& Run);
+	void RequestUsage();
+	void ReceiveModelUsage(int64 InGeneration, const FCrowdyStudioModelUsage& Usage);
+	void ReceiveWorkerFileChanged(int64 InGeneration, const FJsonObject& Payload);
+
+	/** The grid the dock is on, as the agent reads it. */
+	TSharedRef<FJsonObject> GridContext() const;
+
+	/** Sends page.context with the grid the dock is on. */
+	void TellGridContext(int64 InGeneration);
+
 	void AgentTokenChanged(int64 UserId, const FString& Token);
 	UFUNCTION()
 	void AgentBootChanged();
@@ -207,12 +239,23 @@ private:
 	FString CurrentProjectId;
 	FString CurrentProjectName;
 	FString CurrentRevision;
+	FString CurrentServerModule;
+	FString CurrentClientModule;
 	bool bCurrentReachesVisitors = false;
 	bool bProjectRead = false;
+	bool bProjectReadInFlight = false;
+	// A save the project has not been read back for yet.
+	bool bProjectDirty = false;
+	bool bUsageInFlight = false;
 	TArray<FString> ChangedFiles;
 	FConstructStudioDeployPrompt Pending;
+	// The module names when the agent asked; the run refuses a project whose names changed since.
+	FString PendingServerModule;
+	FString PendingClientModule;
 	double PromptAge = 0.0;
 	double BootAge = 0.0;
+	double UsageAge = 0.0;
+	double SaveQuietAge = 0.0;
 	bool bRunInFlight = false;
 	bool bBootReplayed = false;
 	bool bFocusReported = false;
@@ -235,6 +278,8 @@ private:
 
 	TSharedPtr<FConstructStudioDockChannel> Channel;
 	TSharedPtr<const FCrowdyStudioAgentBoot> AgentBoot;
+	TSharedPtr<FConstructStudioDockPlatform> Platform;
+	TSharedPtr<FConstructStudioDockPlatform> PlatformForTests;
 	TSharedPtr<SWebBrowser> Browser;
 	TWeakObjectPtr<UCrowdyStudioAgent> BoundAgent;
 	FDelegateHandle AgentTokenHandle;

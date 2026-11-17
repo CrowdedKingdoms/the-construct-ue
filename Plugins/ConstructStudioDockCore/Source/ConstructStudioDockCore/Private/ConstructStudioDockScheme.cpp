@@ -377,8 +377,9 @@ TArray<TPair<FString, FString>> ConstructStudioDockScheme::HeadersFor(const FStr
 	const FString Extra = ConnectOrigins.IsEmpty() ? FString() : TEXT(" ") + FString::Join(ConnectOrigins, TEXT(" "));
 	const bool bHarness = Path.StartsWith(TEXT("dsh/"), ESearchCase::CaseSensitive);
 	// The harness compiles module bodies with new Function, runs its worker from blob URLs and calls the API; the page does none of it.
+	// The harness renders the agent's markdown, so images and every other load stay on this origin: only connect-src reaches the API.
 	const FString Policy = bHarness
-		? FString::Printf(TEXT("script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; worker-src 'self' blob:; connect-src 'self' blob:%s; frame-ancestors 'self'"), *Extra)
+		? FString::Printf(TEXT("default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:%s; worker-src 'self' blob:; frame-src 'self'; media-src 'self' blob:; manifest-src 'self'"), *Extra)
 		: FString(TEXT("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'"));
 	return {
 		{TEXT("Cross-Origin-Opener-Policy"), TEXT("same-origin")},

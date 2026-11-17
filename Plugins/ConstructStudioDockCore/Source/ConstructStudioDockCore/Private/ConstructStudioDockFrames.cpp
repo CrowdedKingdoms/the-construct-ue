@@ -17,7 +17,11 @@ namespace
 	{
 		FString Json;
 		const TSharedRef<FFrameWriter> Writer = FFrameWriterFactory::Create(&Json);
-		return FJsonSerializer::Serialize(Object, Writer) ? Json : FString();
+		if (!FJsonSerializer::Serialize(Object, Writer))
+		{
+			return FString();
+		}
+		return Json;
 	}
 
 	/** A string as a JSON literal, which is also a valid YAML double-quoted scalar. */
@@ -208,6 +212,7 @@ void FConstructStudioDockChannel::Begin(int64 InGeneration, const FString& InNon
 	Generation = InGeneration;
 	Nonce = InNonce;
 	bPageJoined = false;
+	bReadyGreeted = false;
 }
 
 void FConstructStudioDockChannel::End()
@@ -215,6 +220,7 @@ void FConstructStudioDockChannel::End()
 	Generation = 0;
 	Nonce.Reset();
 	bPageJoined = false;
+	bReadyGreeted = false;
 }
 
 void FConstructStudioDockChannel::SetPageJoined(int64 InGeneration)
@@ -228,6 +234,17 @@ void FConstructStudioDockChannel::SetPageJoined(int64 InGeneration)
 bool FConstructStudioDockChannel::HasPageJoined() const
 {
 	return bPageJoined;
+}
+
+bool FConstructStudioDockChannel::GreetReady(int64 InGeneration)
+{
+	// The worker answers every page.hello with worker.ready, so greeting each one would never end.
+	if (!bPageJoined || InGeneration == 0 || InGeneration != Generation)
+	{
+		return false;
+	}
+	bReadyGreeted = !bReadyGreeted;
+	return bReadyGreeted;
 }
 
 int64 FConstructStudioDockChannel::GetGeneration() const
