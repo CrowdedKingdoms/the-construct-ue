@@ -8,8 +8,8 @@ struct FCrowdyStudioAgentBoot;
 /** Why the dock refuses one of the agent's requests; each maps to the harness's own error code. */
 enum class EConstructStudioDockRefusal : uint8
 {
-	/** A request the dock answers in Unreal, but not in this build. */
-	NotOfferedYet,
+	/** A request the dock answers in Unreal that could not be done; the refusal's message says why. */
+	Failed,
 	/** A request the dock never answers in Unreal. */
 	NotOffered
 };
@@ -106,7 +106,8 @@ public:
 	TOptional<FConstructStudioDockFrame> Parse(const FString& Json) const;
 
 	bool Reply(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result) const;
-	bool Refuse(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why) const;
+	/** Refuses a request with Message, or the refusal's own text when Message is empty. */
+	bool Refuse(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why, const FString& Message = FString()) const;
 
 	/** Sends a page event; refuses page.hello and page.token, which carry the token. */
 	bool Tell(int64 InGeneration, const FString& Event, const TSharedRef<FJsonObject>& Payload) const;

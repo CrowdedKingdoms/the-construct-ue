@@ -102,12 +102,12 @@ bool ConstructStudioDockFrames::IsAnsweredInUnreal(const FString& Method)
 
 const TCHAR* ConstructStudioDockFrames::RefusalCode(EConstructStudioDockRefusal Why)
 {
-	return Why == EConstructStudioDockRefusal::NotOfferedYet ? TEXT("BRIDGE_UNAVAILABLE") : TEXT("BRIDGE_REFUSED");
+	return Why == EConstructStudioDockRefusal::Failed ? TEXT("PAGE_ERROR") : TEXT("BRIDGE_REFUSED");
 }
 
 const TCHAR* ConstructStudioDockFrames::RefusalMessage(EConstructStudioDockRefusal Why)
 {
-	return Why == EConstructStudioDockRefusal::NotOfferedYet ? TEXT("Not offered yet in Unreal.") : TEXT("Not offered in Unreal.");
+	return Why == EConstructStudioDockRefusal::Failed ? TEXT("The request could not be done.") : TEXT("Not offered in Unreal.");
 }
 
 FString ConstructStudioDockFrames::PersistScope(int64 AppId, int64 UserId)
@@ -319,12 +319,12 @@ bool FConstructStudioDockChannel::Reply(int64 InGeneration, const FString& Id, c
 	return Deliver(InGeneration, Frame);
 }
 
-bool FConstructStudioDockChannel::Refuse(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why) const
+bool FConstructStudioDockChannel::Refuse(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why, const FString& Message) const
 {
 	const TSharedRef<FJsonObject> Frame = Envelope(TEXT("err"));
 	Frame->SetStringField(TEXT("id"), Id);
 	Frame->SetStringField(TEXT("code"), ConstructStudioDockFrames::RefusalCode(Why));
-	Frame->SetStringField(TEXT("message"), ConstructStudioDockFrames::RefusalMessage(Why));
+	Frame->SetStringField(TEXT("message"), Message.IsEmpty() ? FString(ConstructStudioDockFrames::RefusalMessage(Why)) : Message.Left(500));
 	return Deliver(InGeneration, Frame);
 }
 

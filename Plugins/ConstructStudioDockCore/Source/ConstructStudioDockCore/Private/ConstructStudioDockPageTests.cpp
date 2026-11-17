@@ -266,7 +266,7 @@ bool FConstructStudioDockFrameGenerationTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("an older boot cannot mark the page joined"), Channel.HasPageJoined());
 	Channel.SetPageJoined(2);
 	TestFalse(TEXT("a late answer from the older boot is dropped"), Channel.Reply(1, TEXT("a"), Result));
-	TestFalse(TEXT("so is a late refusal"), Channel.Refuse(1, TEXT("a"), EConstructStudioDockRefusal::NotOfferedYet));
+	TestFalse(TEXT("so is a late refusal"), Channel.Refuse(1, TEXT("a"), EConstructStudioDockRefusal::Failed));
 	TestTrue(TEXT("the new boot's answer goes out"), Channel.Reply(2, TEXT("b"), Result));
 	TestEqual(TEXT("two frames went out"), Delivered.Num(), 2);
 	TestTrue(TEXT("the new boot's answer carries the new nonce"), Delivered.Num() == 2 && Delivered[1].Contains(TEXT("\"n\":\"nonce-2\"")) && Delivered[1].Contains(TEXT("\"id\":\"b\"")));
@@ -381,7 +381,8 @@ bool FConstructStudioDockBridgeOriginTest::RunTest(const FString& Parameters)
 	Bridge->Send(WorkerRequest(Nonce, TEXT("2"), TEXT("grid.programRun")));
 	Bridge->Send(WorkerRequest(TEXT("not-the-nonce"), TEXT("3"), TEXT("studio.projectList")));
 	TestEqual(TEXT("two requests answered, the stray one dropped"), Scripts.Num(), 3);
-	TestTrue(TEXT("a request answered later is refused as not offered yet"), Scripts.Num() == 3 && Scripts[1].Contains(TEXT("\"code\":\"BRIDGE_UNAVAILABLE\"")) && Scripts[1].Contains(TEXT("\"id\":\"1\"")));
+	TestTrue(TEXT("a request the dock answers in Unreal gets its answer"), Scripts.Num() == 3 && Scripts[1].Contains(TEXT("\"t\":\"res\"")) && Scripts[1].Contains(TEXT("\"id\":\"1\""))
+		&& Scripts[1].Contains(TEXT("\"projects\":[]")));
 	TestTrue(TEXT("a grid program request is refused as not offered"), Scripts.Num() == 3 && Scripts[2].Contains(TEXT("\"code\":\"BRIDGE_REFUSED\"")) && Scripts[2].Contains(TEXT("\"id\":\"2\"")));
 	Bridge->Send(WorkerEvent(Nonce, TEXT("worker.ready")));
 	TestEqual(TEXT("worker.ready sends page.hello again, then the grid's context"), Scripts.Num(), 5);

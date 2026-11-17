@@ -10,6 +10,7 @@ public class ConstructHarness : ModuleRules
 			"ConstructHub",
 			"ConstructPresence",
 			"ConstructShell",
+			"ConstructStudioDockCore",
 			"ConstructWebcam",
 			"ConstructWorld",
 			"Core",

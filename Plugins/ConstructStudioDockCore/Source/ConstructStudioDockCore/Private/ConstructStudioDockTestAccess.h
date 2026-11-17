@@ -50,6 +50,11 @@ struct FConstructStudioDockTestAccess
 		Dock.ClaimBoot();
 	}
 
+	static void FailNow(UConstructStudioDock& Dock)
+	{
+		Dock.Fail(EConstructStudioDockReason::HarnessFailed, FText::GetEmpty());
+	}
+
 	static void Boot(UConstructStudioDock& Dock, int64 Generation, EConstructStudioDockState State, EConstructStudioDockReason Reason = EConstructStudioDockReason::None, const FText& Text = FText::GetEmpty())
 	{
 		Dock.ReceiveBootOutcome(Generation, State, Reason, Text);
@@ -162,6 +167,41 @@ struct FConstructStudioDockTestAccess
 	static bool Reply(UConstructStudioDock& Dock, int64 Generation, const FString& Id, const TSharedRef<FJsonObject>& Result)
 	{
 		return Dock.ReplyToAgent(Generation, Id, Result);
+	}
+
+	/** One request from the agent, as the page relays it for the boot Generation. */
+	static void AgentRequest(UConstructStudioDock& Dock, int64 Generation, const FString& Method, const FString& Id, const TSharedPtr<FJsonObject>& Params = nullptr)
+	{
+		Dock.ReceiveAgentRequest(Generation, Method, Id, Params);
+	}
+
+	static int32 HeldRequestCount(const UConstructStudioDock& Dock)
+	{
+		return Dock.HeldRequests.Num();
+	}
+
+	/** Stands in for the world's Mod Scripts reporting a script start. */
+	static void ScriptStarted(UConstructStudioDock& Dock, const FString& ModId, const FString& Digest)
+	{
+		Dock.ReceiveScriptStarted(Dock.Generation, ModId, Digest);
+	}
+
+	/** Stands in for the world's Mod Scripts reporting a script stop. */
+	static void ScriptStopped(UConstructStudioDock& Dock, const FString& ModId, const FString& Digest, ECrowdyModScriptStop Why)
+	{
+		Dock.ReceiveScriptStopped(Dock.Generation, ModId, Digest, Why);
+	}
+
+	/** Stands in for the chunk the local player stands in, which needs a world with a pawn. */
+	static void SetPlayerChunk(UConstructStudioDock& Dock, const FInt64Vector& Chunk)
+	{
+		Dock.ChunkForTests = Chunk;
+	}
+
+	/** Answers the dock's observations instead of the world's observation subsystem. */
+	static void ObserveWith(UConstructStudioDock& Dock, TFunction<TSharedPtr<FJsonObject>(const TOptional<FConstructStudioObservedGrid>&)> Observe)
+	{
+		Dock.ObserveForTests = MoveTemp(Observe);
 	}
 
 	static FDelegateHandle ListenOutbound(TFunction<void(UConstructStudioDock&, FName, const FString&)> Listener)

@@ -17,6 +17,8 @@ public class ConstructStudioDockCore : ModuleRules
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
+            "ConstructPresence",
+            "ConstructShell",
             "CrowdyNet",
             "CrowdyReplication",
             "CrowdyServices",

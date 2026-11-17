@@ -5,6 +5,7 @@
 #include "ConstructStudioDockFrames.h"
 #include "ConstructStudioDockLog.h"
 #include "ConstructStudioDockPlatform.h"
+#include "ConstructStudioDockReplies.h"
 #include "ConstructStudioDockScheme.h"
 #include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
@@ -202,6 +203,8 @@ EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText&
 	bBootReplayed = false;
 	bLiveBoot = false;
 	bFocusReported = false;
+	ResetRequests();
+	CaptureCount = 0;
 	if (!Channel.IsValid())
 	{
 		Channel = MakeShared<FConstructStudioDockChannel>([this](const FString& FrameJson) { DeliverToPage(FrameJson); });
@@ -239,6 +242,7 @@ void UConstructStudioDock::CloseFor(EConstructStudioDockReason Why)
 	const bool bHadFocus = bFocusReported;
 	Pending = FConstructStudioDeployPrompt();
 	RefuseCaptures(TEXT("closed"));
+	RefuseHeldRequests(TEXT("The Studio dock closed."));
 	TellAgent(Generation, TEXT("page.bye"), MakeShared<FJsonObject>());
 	Teardown();
 	ClearPlaceholderFocus();
@@ -387,12 +391,15 @@ void UConstructStudioDock::AnswerDeployPrompt(int64 PromptId, bool bRun)
 	}
 	if (!bRun)
 	{
+		const bool bLive = Pending.Kind == EConstructStudioDeployKind::Live;
 		Pending = FConstructStudioDeployPrompt();
 		Send(TEXT("AnswerDeployPrompt"), TEXT("NotNow"));
+		FailDeploy(bLive ? TEXT("The player declined the live deploy. Keep working with draft tests.")
+			: TEXT("The player declined the draft test. Ask them before testing again."));
 		return;
 	}
-	if (Pending.GridId != CurrentGridId || !Pending.ProjectId.Equals(CurrentProjectId, ESearchCase::CaseSensitive)
-		|| !Pending.Revision.Equals(CurrentRevision, ESearchCase::CaseSensitive))
+	if (State != EConstructStudioDockState::Ready || Pending.GridId != CurrentGridId
+		|| !Pending.ProjectId.Equals(CurrentProjectId, ESearchCase::CaseSensitive) || !Pending.Revision.Equals(CurrentRevision, ESearchCase::CaseSensitive))
 	{
 		WithdrawPrompt(TEXT("Refused"));
 		return;
@@ -432,6 +439,9 @@ void UConstructStudioDock::ReceiveLiveModding(int64 InGeneration, const FConstru
 	if (Verdict.Result != ECrowdyStudioResult::Success || !Verdict.bAllowed)
 	{
 		ReceiveRunAnswer(InGeneration, false);
+		const TCHAR* Why = Verdict.Result == ECrowdyStudioResult::Success ? TEXT("Allow Live Modding is off for this app, so nothing was built or deployed.")
+			: TEXT("The app's Allow Live Modding switch could not be read, so nothing was built or deployed.");
+		FailDeploy(Verdict.Message.IsEmpty() ? FString(Why) : Verdict.Message);
 		return;
 	}
 	const ECrowdyStudioRunMode Mode = Approved.Kind == EConstructStudioDeployKind::Live ? ECrowdyStudioRunMode::Live : ECrowdyStudioRunMode::DraftTest;
@@ -447,7 +457,49 @@ void UConstructStudioDock::ReceiveLiveModding(int64 InGeneration, const FConstru
 
 void UConstructStudioDock::ReceiveModRun(int64 InGeneration, const FCrowdyModRun& Run)
 {
-	ReceiveRunAnswer(InGeneration, Run.Result == ECrowdyModResult::Success);
+	if (!IsCurrent(InGeneration) || !bRunInFlight)
+	{
+		return;
+	}
+	const bool bOk = ConstructStudioDockReplies::RunIsOk(Run);
+	ReceiveRunAnswer(InGeneration, bOk);
+	// The agent stopped waiting for this run, so its answer is not sent.
+	if (DeployRequestId.IsEmpty())
+	{
+		return;
+	}
+	// Refused before anything was built (busy, a changed revision, signed out), so there is no half to report.
+	if (Run.Targets.IsEmpty())
+	{
+		FailDeploy(Run.Message.IsEmpty() ? FString(TEXT("The run did not start, so nothing was built or deployed.")) : Run.Message);
+		return;
+	}
+	if (Run.Result != ECrowdyModResult::Success)
+	{
+		AnswerDeploy(ConstructStudioDockReplies::BuildResult(Run));
+		return;
+	}
+	BuildReply = ConstructStudioDockReplies::BuildResult(Run);
+	const FCrowdyModRunTarget* Client = bOk ? ConstructStudioDockReplies::DeployedClient(Run) : nullptr;
+	AwaitedClientModId = Client ? Client->ModId : FString();
+	AwaitedClientDigest = Client ? Client->Digest : FString();
+	AwaitedClientGridId = Run.GridId;
+	const FCrowdyModRunTarget* Server = bOk ? ConstructStudioDockReplies::DeployedServer(Run) : nullptr;
+	if (!Server || !Platform.IsValid() || !Platform->ListMods)
+	{
+		ContinueBuild();
+		return;
+	}
+	// Deployed is not running: the SERVER mod's own switch and block decide whether it runs.
+	bServerModReading = true;
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	Platform->ListMods(Run.GridId, [Weak, InGeneration, RequestId = DeployRequestId, ModId = Server->ModId, Module = Server->Module](const FCrowdyModList& List)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveServerMod(InGeneration, RequestId, ModId, Module, List);
+		}
+	});
 }
 
 void UConstructStudioDock::OpenWallet()
@@ -620,22 +672,70 @@ void UConstructStudioDock::ReceiveFileChanged(int64 InGeneration, const FString&
 	}
 }
 
-void UConstructStudioDock::ReceiveDeployRequest(int64 InGeneration, EConstructStudioDeployKind Kind)
+void UConstructStudioDock::ReceiveDeployRequest(int64 InGeneration, EConstructStudioDeployKind Kind, const FString& RequestId)
 {
 	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Ready)
 	{
+		FailRequest(InGeneration, RequestId, ConstructStudioDockReplies::NotReadyText);
 		return;
 	}
 	const TCHAR* Message = Kind == EConstructStudioDeployKind::Live ? TEXT("studio.deployLive") : TEXT("studio.draftTest");
-	if (Pending.PromptId != 0 || bRunInFlight)
+	if (Pending.PromptId != 0 || bRunInFlight || bDeployReading || bDeployChecking || BuildReply.IsValid())
 	{
 		Send(Message, TEXT("refused: busy"));
+		FailRequest(InGeneration, RequestId, TEXT("A deploy is already waiting for the player or running. Wait for it before asking again."));
+		return;
+	}
+	// A live dock reads the project fresh, so the prompt carries the revision saved now, not the last one heard of.
+	if (bLiveBoot && !CurrentProjectId.IsEmpty())
+	{
+		DeployKind = Kind;
+		DeployRequestId = RequestId;
+		DeployRequestAge = 0.0;
+		bDeployReading = true;
+		// A read already in flight is waited for; a save after it began marks the project dirty, and it is read again.
+		if (!bProjectReadInFlight)
+		{
+			bProjectDirty = false;
+			ReadProject();
+		}
 		return;
 	}
 	// A project id passed to Open is not enough: the prompt needs the revision the platform read for it, after the last save.
-	if (!bProjectRead || CurrentRevision.IsEmpty() || bProjectDirty || bProjectReadInFlight)
+	if (bLiveBoot || !bProjectRead || CurrentRevision.IsEmpty() || bProjectDirty || bProjectReadInFlight)
 	{
 		Send(Message, TEXT("refused: no project"));
+		FailRequest(InGeneration, RequestId, ConstructStudioDockReplies::NoProjectText);
+		return;
+	}
+	RaisePrompt(Kind);
+}
+
+void UConstructStudioDock::ContinueDeploy(ECrowdyStudioResult Result, const FString& Message)
+{
+	// A save while the project was read: read it again, so the prompt never shows a stale revision.
+	if (bProjectDirty && Result == ECrowdyStudioResult::Success)
+	{
+		bProjectDirty = false;
+		ReadProject();
+		return;
+	}
+	bDeployReading = false;
+	if (Result != ECrowdyStudioResult::Success || CurrentRevision.IsEmpty())
+	{
+		Send(DeployKind == EConstructStudioDeployKind::Live ? TEXT("studio.deployLive") : TEXT("studio.draftTest"), TEXT("refused: no project"));
+		FailDeploy(Message.IsEmpty() ? FString(ConstructStudioDockReplies::NoProjectText) : Message);
+		return;
+	}
+	CheckReplacedMod();
+}
+
+void UConstructStudioDock::RaisePrompt(EConstructStudioDeployKind Kind)
+{
+	// A prompt is only ever raised on a running dock, whatever answer arrives late.
+	if (State != EConstructStudioDockState::Ready)
+	{
+		ForgetDeploy();
 		return;
 	}
 	Pending.PromptId = ++LastPromptId;
@@ -643,10 +743,15 @@ void UConstructStudioDock::ReceiveDeployRequest(int64 InGeneration, EConstructSt
 	Pending.GridId = CurrentGridId;
 	Pending.GridLabel = CurrentGridLabel;
 	Pending.ProjectId = CurrentProjectId;
-	Pending.ProjectName = CurrentProjectName;
+	// The agent may have written the name and the paths, and the player reads them in the prompt.
+	Pending.ProjectName = ConstructStudioDockReplies::PlainText(CurrentProjectName);
 	Pending.Revision = CurrentRevision;
 	Pending.bReachesVisitors = bCurrentReachesVisitors;
-	Pending.ChangedFiles = ChangedFiles;
+	Pending.ChangedFiles.Reset(ChangedFiles.Num());
+	for (const FString& File : ChangedFiles)
+	{
+		Pending.ChangedFiles.Add(ConstructStudioDockReplies::PlainText(File));
+	}
 	PendingServerModule = CurrentServerModule;
 	PendingClientModule = CurrentClientModule;
 	PromptAge = 0.0;
@@ -664,13 +769,14 @@ void UConstructStudioDock::ReceiveRunAnswer(int64 InGeneration, bool bOk)
 	Send(TEXT("RunProject"), bOk ? TEXT("ok") : TEXT("failed"));
 }
 
-void UConstructStudioDock::ReceiveScreenshotRequest(int64 InGeneration, const FString& Label)
+void UConstructStudioDock::ReceiveScreenshotRequest(int64 InGeneration, const FString& Label, const FString& RequestId)
 {
 	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Ready)
 	{
+		FailRequest(InGeneration, RequestId, ConstructStudioDockReplies::NotReadyText);
 		return;
 	}
-	RequestCapture(Label, false);
+	RequestCapture(Label, false, RequestId);
 }
 
 void UConstructStudioDock::ReceiveUsage(int64 InGeneration, const FConstructStudioUsage& Usage)
@@ -717,6 +823,22 @@ void UConstructStudioDock::CaptureAnswered(UConstructStudioCaptureRequest& Reque
 	Send(Message, Capture.bCaptured
 		? FString::Printf(TEXT("captured %dx%d"), Capture.Width, Capture.Height)
 		: FString::Printf(TEXT("refused: %s"), *Capture.Refusal));
+	if (Request.bForRun)
+	{
+		FinishRunCapture(Capture);
+		return;
+	}
+	const bool bShot = Capture.bCaptured && !Capture.PngBase64.IsEmpty();
+	if (!Request.RequestId.IsEmpty() && bShot)
+	{
+		AnswerRequest(Request.Generation, Request.RequestId, ConstructStudioDockReplies::Screenshot(Capture, ++CaptureCount));
+		return;
+	}
+	if (!Request.RequestId.IsEmpty())
+	{
+		FailRequest(Request.Generation, Request.RequestId, Capture.Refusal.IsEmpty() ? FString(TEXT("Nothing to capture right now.")) : Capture.Refusal);
+		return;
+	}
 	if (!Request.bShared || !Capture.bCaptured || Capture.PngBase64.IsEmpty())
 	{
 		return;
@@ -782,6 +904,26 @@ bool UConstructStudioDock::Advance(float DeltaSeconds)
 			WithdrawPrompt(TEXT("NotNow"));
 		}
 	}
+	if (!DeployRequestId.IsEmpty())
+	{
+		DeployRequestAge += DeltaSeconds;
+		// The agent has stopped waiting: a run still going finishes on its grid, and its answer is not sent.
+		if (DeployRequestAge >= RequestWaitSeconds)
+		{
+			HeldRequests.Remove(DeployRequestId);
+			ForgetDeploy();
+		}
+	}
+	// The wait for the CLIENT half and its screenshot share one clock, so the answer always goes.
+	if (BuildReply.IsValid() && (bAwaitingClient || bRunCapturing))
+	{
+		ClientWaitAge += DeltaSeconds;
+		if (ClientWaitAge >= ClientStartSeconds)
+		{
+			ClientWaitEnded();
+		}
+	}
+	ObservedClaimAge += DeltaSeconds;
 	return IsCurrent(Ticking);
 }
 
@@ -851,6 +993,8 @@ void UConstructStudioDock::Fail(EConstructStudioDockReason Why, const FText& Tex
 	const int64 Failing = Generation;
 	WithdrawPrompt(TEXT("Refused"));
 	RefuseCaptures(TEXT("failed"));
+	RefuseHeldRequests(TEXT("The Studio agent stopped."));
+	ForgetDeploy();
 	bRunInFlight = false;
 	bProjectDirty = false;
 	bUsageInFlight = false;
@@ -872,6 +1016,9 @@ void UConstructStudioDock::WithdrawPrompt(const TCHAR* Answer)
 	Pending = FConstructStudioDeployPrompt();
 	OnDeployPromptWithdrawn.Broadcast(Withdrawn);
 	Send(TEXT("AnswerDeployPrompt"), Answer);
+	FailDeploy(FCString::Strcmp(Answer, TEXT("NotNow")) == 0
+		? TEXT("The player did not answer the deploy prompt within 60 seconds. Ask them before trying again.")
+		: TEXT("The deploy prompt was withdrawn because the grid, project or saved revision changed. Ask again."));
 }
 
 void UConstructStudioDock::RefuseCaptures(const TCHAR* Why)
@@ -881,22 +1028,26 @@ void UConstructStudioDock::RefuseCaptures(const TCHAR* Why)
 	for (const UConstructStudioCaptureRequest* Request : Refused)
 	{
 		Send(Request->bShared ? TEXT("page.capture") : TEXT("studio.screenshot"), FString::Printf(TEXT("refused: %s"), Why));
+		FailRequest(Request->Generation, Request->RequestId, FString::Printf(TEXT("No screenshot: the Studio dock %s."), Why));
 	}
 }
 
-void UConstructStudioDock::RequestCapture(const FString& Label, bool bShared)
+void UConstructStudioDock::RequestCapture(const FString& Label, bool bShared, const FString& RequestId, bool bForRun)
 {
 	const TCHAR* Message = bShared ? TEXT("page.capture") : TEXT("studio.screenshot");
 	UObject* Host = HostObject.Get();
 	if (!Host)
 	{
 		Send(Message, TEXT("refused: no host"));
+		FailRequest(Generation, RequestId, TEXT("This game is not taking screenshots for the agent right now."));
 		return;
 	}
 	UConstructStudioCaptureRequest* Request = NewObject<UConstructStudioCaptureRequest>(this);
 	Request->Dock = this;
 	Request->Generation = Generation;
+	Request->RequestId = RequestId;
 	Request->bShared = bShared;
+	Request->bForRun = bForRun;
 	PendingCaptures.Add(Request);
 	FOnConstructStudioCaptured OnDone;
 	OnDone.BindUFunction(Request, GET_FUNCTION_NAME_CHECKED(UConstructStudioCaptureRequest, Done));
@@ -1025,7 +1176,7 @@ TSharedPtr<FConstructStudioDockPlatform> UConstructStudioDock::LivePlatform()
 		AgentTokenHandle = Agent->OnAgentTokenChanged.AddUObject(this, &UConstructStudioDock::AgentTokenChanged);
 		Agent->OnAgentBootChanged.AddDynamic(this, &UConstructStudioDock::AgentBootChanged);
 	}
-	return FConstructStudioDockPlatform::Live(*Game);
+	return FConstructStudioDockPlatform::Live(*Game, GetWorld());
 }
 
 UCrowdyStudioAgent* UConstructStudioDock::LiveAgent() const
@@ -1164,6 +1315,11 @@ void UConstructStudioDock::ReceiveStudioProject(int64 InGeneration, ECrowdyStudi
 	if (bBootRead)
 	{
 		ShowPage();
+		return;
+	}
+	if (bDeployReading)
+	{
+		ContinueDeploy(Result, Message);
 	}
 }
 
@@ -1180,20 +1336,22 @@ void UConstructStudioDock::ShowPage()
 
 void UConstructStudioDock::ReceiveWorkerFileChanged(int64 InGeneration, const FJsonObject& Payload)
 {
-	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Ready || !Payload.HasTypedField<EJson::String>(TEXT("path")))
+	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Ready || !Payload.HasTypedField<EJson::String>(TEXT("path"))
+		|| !Payload.HasTypedField<EJson::String>(TEXT("target")))
 	{
 		return;
 	}
-	const FString Path = Payload.GetStringField(TEXT("path")).Left(256);
-	FString Target;
-	if (Payload.HasTypedField<EJson::String>(TEXT("target")))
+	const FString Path = Payload.GetStringField(TEXT("path"));
+	const FString Target = Payload.GetStringField(TEXT("target"));
+	// The page's events are untrusted: only a half's file the project can hold is listed, at most two full crates' files.
+	const bool bHalf = Target.Equals(TEXT("SERVER"), ESearchCase::CaseSensitive) || Target.Equals(TEXT("CLIENT"), ESearchCase::CaseSensitive);
+	if (!bHalf || Path.Len() > 256 || !ConstructStudioDockReplies::IsReadablePath(Path))
 	{
-		Target = Payload.GetStringField(TEXT("target")).Left(16);
+		return;
 	}
-	// The page's events are untrusted, so the list is capped at two full crates' files.
-	if (!Path.IsEmpty() && ChangedFiles.Num() < 2 * UCrowdyMods::MaxFiles)
+	if (ChangedFiles.Num() < 2 * UCrowdyMods::MaxFiles)
 	{
-		ChangedFiles.AddUnique(Target.IsEmpty() ? Path : Target / Path);
+		ChangedFiles.AddUnique(Target / Path);
 	}
 	if (!CurrentProjectId.IsEmpty())
 	{
@@ -1220,13 +1378,15 @@ void UConstructStudioDock::AgentBootChanged()
 		return;
 	}
 	const int64 Restarting = Generation;
-	TellAgent(Generation, TEXT("page.bye"), MakeShared<FJsonObject>());
 	WithdrawPrompt(TEXT("Refused"));
 	RefuseCaptures(TEXT("restarted"));
+	RefuseHeldRequests(TEXT("The Studio agent is restarting."));
+	TellAgent(Generation, TEXT("page.bye"), MakeShared<FJsonObject>());
 	if (!IsCurrent(Restarting))
 	{
 		return;
 	}
+	ForgetDeploy();
 	bRunInFlight = false;
 	bProjectReadInFlight = false;
 	bProjectDirty = false;
@@ -1361,23 +1521,14 @@ void UConstructStudioDock::ReceiveWorkerEvent(int64 InGeneration, const FString&
 	}
 }
 
-void UConstructStudioDock::ReceiveAgentRequest(int64 InGeneration, const FString& Method, const FString& Id, const TSharedPtr<FJsonObject>& Params)
-{
-	if (!IsCurrent(InGeneration))
-	{
-		return;
-	}
-	RefuseToAgent(InGeneration, Id, ConstructStudioDockFrames::IsAnsweredInUnreal(Method) ? EConstructStudioDockRefusal::NotOfferedYet : EConstructStudioDockRefusal::NotOffered);
-}
-
 bool UConstructStudioDock::ReplyToAgent(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result)
 {
 	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Reply(InGeneration, Id, Result);
 }
 
-bool UConstructStudioDock::RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why)
+bool UConstructStudioDock::RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why, const FString& Message)
 {
-	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Refuse(InGeneration, Id, Why);
+	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Refuse(InGeneration, Id, Why, Message);
 }
 
 bool UConstructStudioDock::TellAgent(int64 InGeneration, const FString& Event, const TSharedRef<FJsonObject>& Payload)
@@ -1464,6 +1615,7 @@ void UConstructStudioDock::BindBridge()
 
 void UConstructStudioDock::ReleasePage()
 {
+	ResetRequests();
 	if (Channel.IsValid())
 	{
 		Channel->End();

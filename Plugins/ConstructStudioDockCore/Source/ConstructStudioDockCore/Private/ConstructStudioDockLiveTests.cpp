@@ -6,6 +6,7 @@
 #include "ConstructStudioDockPlatform.h"
 #include "ConstructStudioDockScheme.h"
 #include "ConstructStudioDockTestAccess.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 #include "Serialization/JsonReader.h"
@@ -95,6 +96,19 @@ namespace ConstructStudioDockLiveTests
 				Log.Add(TEXT("Project:") + ProjectId);
 				Projects.Add(MoveTemp(OnDone));
 			};
+			// The grid holds no mod yet, so no deploy prompt would replace one.
+			Calls->ListMods = [this](int64 GridId, TFunction<void(const FCrowdyModList&)> OnDone)
+			{
+				Log.Add(FString::Printf(TEXT("Mods:%lld"), GridId));
+				FCrowdyModList Empty;
+				Empty.Result = ECrowdyModResult::Success;
+				OnDone(Empty);
+			};
+			Calls->GetProjectStatus = [this](int64 GridId, const FString& ProjectId, TFunction<void(const FCrowdyModProjectStatus&)> OnDone)
+			{
+				Log.Add(FString::Printf(TEXT("Status:%lld:%s"), GridId, *ProjectId));
+				OnDone(FCrowdyModProjectStatus());
+			};
 		}
 
 		FFakePlatform(const FFakePlatform&) = delete;
@@ -174,10 +188,14 @@ namespace ConstructStudioDockLiveTests
 		return Verdict;
 	}
 
+	/** A run whose SERVER half reached Running when it went to its end. */
 	FCrowdyModRun MakeRun(ECrowdyModResult Result)
 	{
 		FCrowdyModRun Run;
 		Run.Result = Result;
+		FCrowdyModRunTarget& Server = Run.Targets.AddDefaulted_GetRef();
+		Server.Target = ECrowdyStudioTarget::Server;
+		Server.Phase = Result == ECrowdyModResult::Success ? ECrowdyModRunPhase::Running : ECrowdyModRunPhase::NotStarted;
 		return Run;
 	}
 
@@ -214,10 +232,12 @@ namespace ConstructStudioDockLiveTests
 		return Rig.Dock->GetState() == EConstructStudioDockState::Ready && FAccess::Bridge(*Rig.Dock) != nullptr;
 	}
 
-	int64 RequestPrompt(FRig& Rig, EConstructStudioDeployKind Kind = EConstructStudioDeployKind::DraftTest)
+	/** Asks to deploy and answers the fresh read of p-1 the request makes, at Revision; the new prompt's id, or 0 for none. */
+	int64 RequestPrompt(FRig& Rig, FFakePlatform& Fake, EConstructStudioDeployKind Kind = EConstructStudioDeployKind::DraftTest, const FString& Revision = TEXT("rev-1"))
 	{
 		const int32 Before = Rig.Listener->Prompts.Num();
 		FAccess::Request(*Rig.Dock, Kind);
+		Answer(Fake.Projects, MakeInfo(MakeProject(Revision)));
 		return Rig.Listener->Prompts.Num() > Before ? Rig.Listener->Prompts.Last().PromptId : 0;
 	}
 
@@ -236,7 +256,7 @@ namespace ConstructStudioDockLiveTests
 		{
 			return;
 		}
-		const int64 PromptId = RequestPrompt(Rig);
+		const int64 PromptId = RequestPrompt(Rig, Fake);
 		const TStrongObjectPtr<UConstructStudioDockBridge> Bridge(FAccess::Bridge(*Rig.Dock));
 		// On the dock's origin a bridge still bound would answer the boot material, not an error.
 		FAccess::SetMainFrame(*Rig.Dock, ConstructStudioDockScheme::PageUrl);
@@ -452,7 +472,7 @@ bool FConstructStudioDockLiveCloseRulesTest::RunTest(const FString& Parameters)
 		FRig F;
 		if (TestTrue(TEXT("destruction: the dock reaches Ready"), ReadyLive(F, Fake)))
 		{
-			RequestPrompt(F);
+			RequestPrompt(F, Fake);
 			const TStrongObjectPtr<UConstructStudioDockBridge> Bridge(FAccess::Bridge(*F.Dock));
 			FAccess::SetMainFrame(*F.Dock, ConstructStudioDockScheme::PageUrl);
 			F.Dock->ConditionalBeginDestroy();
@@ -493,7 +513,7 @@ bool FConstructStudioDockLiveGenerationTest::RunTest(const FString& Parameters)
 		{
 			return false;
 		}
-		F.Dock->AnswerDeployPrompt(RequestPrompt(F), true);
+		F.Dock->AnswerDeployPrompt(RequestPrompt(F, Fake), true);
 		TestEqual(TEXT("Run asks the app's switch"), Fake.CountStarting(TEXT("Authorize:")), 1);
 		F.Dock->Close();
 		F.Open();
@@ -509,7 +529,7 @@ bool FConstructStudioDockLiveGenerationTest::RunTest(const FString& Parameters)
 		{
 			return false;
 		}
-		F.Dock->AnswerDeployPrompt(RequestPrompt(F), true);
+		F.Dock->AnswerDeployPrompt(RequestPrompt(F, Fake), true);
 		Answer(Fake.Verdicts, MakeVerdict(true));
 		F.Dock->Close();
 		F.Open();
@@ -528,7 +548,7 @@ bool FConstructStudioDockLiveRunTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	const int64 PromptId = RequestPrompt(F, EConstructStudioDeployKind::Live);
+	const int64 PromptId = RequestPrompt(F, Fake, EConstructStudioDeployKind::Live);
 	if (!TestTrue(TEXT("a prompt is up"), PromptId != 0))
 	{
 		return false;
@@ -536,7 +556,7 @@ bool FConstructStudioDockLiveRunTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("at the read revision"), F.Listener->Prompts.Last().Revision, FString(TEXT("rev-1")));
 	TestTrue(TEXT("a CLIENT half reaches visitors"), F.Listener->Prompts.Last().bReachesVisitors);
 
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("server"), TEXT("Cargo.toml")));
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("SERVER"), TEXT("Cargo.toml")));
 	FAccess::Advance(*F.Dock, 1.5f);
 	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-1"), TEXT("renamed"), TEXT("renamed-client"))));
 	TestEqual(TEXT("a read at the same revision keeps the prompt"), F.Listener->WithdrawnIds.Num(), 0);
@@ -546,20 +566,20 @@ bool FConstructStudioDockLiveRunTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and runs nothing before it answers"), Fake.CountStarting(TEXT("Run:")), 0);
 	Answer(Fake.Verdicts, MakeVerdict(true));
 	TestEqual(TEXT("an allowed run uses the prompt's grid, project, revision and module names"), Fake.Count(TEXT("Run:100:p-1:rev-1:Live:srv:srv-client")), 1);
-	TestEqual(TEXT("the slot is held while it runs"), RequestPrompt(F), int64(0));
+	TestEqual(TEXT("the slot is held while it runs"), RequestPrompt(F, Fake), int64(0));
 	Answer(Fake.Runs, MakeRun(ECrowdyModResult::Success));
 	TestEqual(TEXT("the run's answer frees the slot"), F.SentCount(TEXT("RunProject:ok")), 1);
 
-	F.Dock->AnswerDeployPrompt(RequestPrompt(F), true);
+	F.Dock->AnswerDeployPrompt(RequestPrompt(F, Fake), true);
 	Answer(Fake.Verdicts, MakeVerdict(false));
 	TestEqual(TEXT("a switch that says no runs nothing"), Fake.CountStarting(TEXT("Run:")), 1);
 	TestEqual(TEXT("and is answered as a failed run"), F.SentCount(TEXT("RunProject:failed")), 1);
 
-	F.Dock->AnswerDeployPrompt(RequestPrompt(F), true);
+	F.Dock->AnswerDeployPrompt(RequestPrompt(F, Fake), true);
 	Answer(Fake.Verdicts, MakeVerdict(true, ECrowdyStudioResult::Failed));
 	TestEqual(TEXT("a switch that could not be read runs nothing"), Fake.CountStarting(TEXT("Run:")), 1);
 	TestEqual(TEXT("and is answered as a failed run too"), F.SentCount(TEXT("RunProject:failed")), 2);
-	TestTrue(TEXT("then a new prompt shows"), RequestPrompt(F) != 0);
+	TestTrue(TEXT("then a new prompt shows"), RequestPrompt(F, Fake) != 0);
 	return true;
 }
 
@@ -572,44 +592,56 @@ bool FConstructStudioDockLiveRevisionTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	const int64 PromptId = RequestPrompt(F);
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("server"), TEXT("src/lib.rs")));
-	TestEqual(TEXT("a saved file is not read back at once"), Fake.Count(TEXT("Project:p-1")), 0);
+	const int64 PromptId = RequestPrompt(F, Fake);
+	TestEqual(TEXT("the request read the project fresh before its prompt"), Fake.Count(TEXT("Project:p-1")), 1);
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("SERVER"), TEXT("src/lib.rs")));
+	TestEqual(TEXT("a saved file is not read back at once"), Fake.Count(TEXT("Project:p-1")), 1);
 	FAccess::Advance(*F.Dock, 1.f);
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("client"), TEXT("src/lib.rs")));
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("CLIENT"), TEXT("src/lib.rs")));
 	FAccess::Advance(*F.Dock, 1.f);
-	TestEqual(TEXT("nor while the saves keep coming"), Fake.Count(TEXT("Project:p-1")), 0);
+	TestEqual(TEXT("nor while the saves keep coming"), Fake.Count(TEXT("Project:p-1")), 1);
 	TestEqual(TEXT("both files are listed as changed"), FAccess::ChangedFileCount(*F.Dock), 2);
 	FAccess::Advance(*F.Dock, 0.6f);
-	TestEqual(TEXT("1.5 s after the last save the project is read once"), Fake.Count(TEXT("Project:p-1")), 1);
+	TestEqual(TEXT("1.5 s after the last save the project is read once"), Fake.Count(TEXT("Project:p-1")), 2);
 	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-2"))));
 	TestTrue(TEXT("a new revision withdraws the prompt"), F.Listener->WithdrawnIds == TArray<int64>({PromptId}));
 	TestEqual(TEXT("and refuses it to the agent"), F.SentCount(TEXT("AnswerDeployPrompt:Refused")), 1);
 	F.Dock->AnswerDeployPrompt(PromptId, true);
 	TestEqual(TEXT("Run on the withdrawn prompt does nothing"), Fake.CountStarting(TEXT("Authorize:")), 0);
 
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("server"), TEXT("src/other.rs")));
-	TestEqual(TEXT("a request while a save is unread shows no prompt"), RequestPrompt(F), int64(0));
-	TestEqual(TEXT("and is refused as no project"), F.SentCount(TEXT("studio.draftTest:refused: no project")), 1);
-	FAccess::Advance(*F.Dock, 1.5f);
-	TestEqual(TEXT("the save is read back"), Fake.Count(TEXT("Project:p-1")), 2);
-	TestEqual(TEXT("a request while that read is in flight shows no prompt"), RequestPrompt(F), int64(0));
-	TestEqual(TEXT("and is refused too"), F.SentCount(TEXT("studio.draftTest:refused: no project")), 2);
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("client"), TEXT("src/other.rs")));
-	FAccess::Advance(*F.Dock, 1.5f);
-	TestEqual(TEXT("one read at a time"), Fake.Count(TEXT("Project:p-1")), 2);
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("SERVER"), TEXT("src/other.rs")));
+	FAccess::Request(*F.Dock, EConstructStudioDeployKind::DraftTest);
+	TestEqual(TEXT("a request while a save is unread reads the project at once"), Fake.Count(TEXT("Project:p-1")), 3);
+	TestEqual(TEXT("and shows no prompt before it answers"), F.Listener->Prompts.Num(), 1);
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("CLIENT"), TEXT("src/other.rs")));
 	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-3"))));
-	FAccess::Advance(*F.Dock, 0.016f);
-	TestEqual(TEXT("the save made during a read is read after it"), Fake.Count(TEXT("Project:p-1")), 3);
+	TestEqual(TEXT("a save during that read reads the project again"), Fake.Count(TEXT("Project:p-1")), 4);
+	TestEqual(TEXT("still with no prompt"), F.Listener->Prompts.Num(), 1);
 	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-4"))));
-	RequestPrompt(F);
-	TestEqual(TEXT("the agent's next prompt carries the read revision"), F.Listener->Prompts.Last().Revision, FString(TEXT("rev-4")));
+	TestEqual(TEXT("the prompt carries the revision read after the last save"), F.Listener->Prompts.Last().Revision, FString(TEXT("rev-4")));
 	TestEqual(TEXT("and every changed file"), F.Listener->Prompts.Last().ChangedFiles.Num(), 4);
+	FAccess::Advance(*F.Dock, 1.5f);
+	TestEqual(TEXT("and the quiet read has nothing left to read"), Fake.Count(TEXT("Project:p-1")), 4);
+	F.Dock->AnswerDeployPrompt(F.Listener->Prompts.Last().PromptId, false);
+
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("SERVER"), TEXT("src/fourth.rs")));
+	FAccess::Advance(*F.Dock, 1.5f);
+	TestEqual(TEXT("the save is read back"), Fake.Count(TEXT("Project:p-1")), 5);
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("CLIENT"), TEXT("src/fourth.rs")));
+	FAccess::Advance(*F.Dock, 1.5f);
+	TestEqual(TEXT("one read at a time"), Fake.Count(TEXT("Project:p-1")), 5);
+	FAccess::Request(*F.Dock, EConstructStudioDeployKind::DraftTest);
+	TestEqual(TEXT("a request while a read is in flight waits for it"), Fake.Count(TEXT("Project:p-1")), 5);
+	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-5"))));
+	TestEqual(TEXT("the save made during that read is read before the prompt"), Fake.Count(TEXT("Project:p-1")), 6);
+	TestEqual(TEXT("which has not shown yet"), F.Listener->Prompts.Num(), 2);
+	Answer(Fake.Projects, MakeInfo(MakeProject(TEXT("rev-6"))));
+	TestEqual(TEXT("then the prompt shows what was read last"), F.Listener->Prompts.Last().Revision, FString(TEXT("rev-6")));
 
 	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), MakeShared<FJsonObject>());
 	FAccess::Advance(*F.Dock, 1.5f);
-	TestEqual(TEXT("an event naming no file reads nothing"), Fake.Count(TEXT("Project:p-1")), 3);
-	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("server"), TEXT("src/third.rs")));
+	TestEqual(TEXT("an event naming no file reads nothing"), Fake.Count(TEXT("Project:p-1")), 6);
+	FAccess::WorkerEvent(*F.Dock, TEXT("worker.fileChanged"), FileChanged(TEXT("SERVER"), TEXT("src/third.rs")));
 	FAccess::Advance(*F.Dock, 1.5f);
 	Answer(Fake.Projects, MakeInfo(FCrowdyStudioProject(), ECrowdyStudioResult::Failed));
 	TestEqual(TEXT("a failed read keeps the prompt"), F.Listener->WithdrawnIds.Num(), 1);
@@ -625,7 +657,7 @@ bool FConstructStudioDockLiveDeclineTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	const int64 PromptId = RequestPrompt(F);
+	const int64 PromptId = RequestPrompt(F, Fake);
 	FAccess::Advance(*F.Dock, 59.f);
 	TestEqual(TEXT("at 59 s the prompt is still up"), F.Listener->WithdrawnIds.Num(), 0);
 	FAccess::Advance(*F.Dock, 1.5f);
@@ -687,12 +719,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockLivePageEventsTest, "Constr
 bool FConstructStudioDockLivePageEventsTest::RunTest(const FString& Parameters)
 {
 	FFakePlatform Fake;
+	// Declared before the rig, whose Close on the way out still delivers page.bye into it.
+	TArray<FString> Scripts;
 	FRig F;
 	if (!TestTrue(TEXT("the dock reaches Ready"), ReadyLive(F, Fake)))
 	{
 		return false;
 	}
-	TArray<FString> Scripts;
 	FAccess::SetMainFrame(*F.Dock, ConstructStudioDockScheme::PageUrl);
 	FAccess::CaptureScripts(*F.Dock, [&Scripts](const FString& Script) { Scripts.Add(Script); });
 	UConstructStudioDockBridge* Bridge = FAccess::Bridge(*F.Dock);
@@ -729,12 +762,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockLiveOpeningGridTest, "Const
 bool FConstructStudioDockLiveOpeningGridTest::RunTest(const FString& Parameters)
 {
 	FFakePlatform Fake;
+	// Declared before the rig, whose Close on the way out still delivers page.bye into it.
+	TArray<FString> Scripts;
 	FRig F;
 	if (!TestTrue(TEXT("the dock reaches Ready"), ReadyLive(F, Fake)))
 	{
 		return false;
 	}
-	TArray<FString> Scripts;
 	FAccess::SetMainFrame(*F.Dock, ConstructStudioDockScheme::PageUrl);
 	FAccess::CaptureScripts(*F.Dock, [&Scripts](const FString& Script) { Scripts.Add(Script); });
 	TSharedPtr<FJsonObject> Boot;
@@ -753,6 +787,68 @@ bool FConstructStudioDockLiveOpeningGridTest::RunTest(const FString& Parameters)
 		&& Scripts[2].Contains(TEXT("\"gridId\":\"100\"")) && Scripts[2].Contains(TEXT("\"label\":\"Chunk 1, 2, 3\"")));
 	FAccess::WorkerEvent(*F.Dock, TEXT("worker.ready"), MakeShared<FJsonObject>());
 	TestEqual(TEXT("the ready that answers that hello sends neither"), Scripts.Num(), 3);
+	return true;
+}
+
+namespace ConstructStudioDockLiveTests
+{
+	/** Makes one call and says how it was answered: "failed" once with a message, else what went wrong. */
+	template <typename AnswerType, typename ResultType>
+	FString GoneAnswer(TFunctionRef<void(TFunction<void(const AnswerType&)>)> Call, ResultType Failed)
+	{
+		int32 Answers = 0;
+		bool bFailedPlainly = false;
+		Call([&Answers, &bFailedPlainly, Failed](const AnswerType& Answer)
+		{
+			++Answers;
+			bFailedPlainly = Answer.Result == Failed && !Answer.Message.IsEmpty();
+		});
+		if (Answers != 1)
+		{
+			return FString::Printf(TEXT("answered %d times"), Answers);
+		}
+		return bFailedPlainly ? FString(TEXT("failed")) : FString(TEXT("answered without failing plainly"));
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockLiveGoneTest, "Construct.StudioDock.Live.EveryCallAnswersWhenItsSubsystemIsGone", LiveFlags)
+bool FConstructStudioDockLiveGoneTest::RunTest(const FString& Parameters)
+{
+	// A game instance that never started has none of the SDK's subsystems, as one that is ending.
+	const TStrongObjectPtr<UGameInstance> Game(NewObject<UGameInstance>(GetTransientPackage()));
+	const TSharedRef<FConstructStudioDockPlatform> Calls = FConstructStudioDockPlatform::Live(*Game, nullptr);
+	const FString Failed(TEXT("failed"));
+	constexpr ECrowdyStudioResult Studio = ECrowdyStudioResult::Failed;
+	constexpr ECrowdyModResult Mods = ECrowdyModResult::Failed;
+	constexpr ECrowdyClaimResult Claims = ECrowdyClaimResult::Failed;
+	constexpr ECrowdyModScriptReadResult Scripts = ECrowdyModScriptReadResult::Failed;
+	TestEqual(TEXT("GetAgentBoot"), GoneAnswer<FCrowdyStudioAgentBoot>([&Calls](TFunction<void(const FCrowdyStudioAgentBoot&)> OnDone) { Calls->GetAgentBoot(MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("GetProviderConsent"), GoneAnswer<FCrowdyStudioConsent>([&Calls](TFunction<void(const FCrowdyStudioConsent&)> OnDone) { Calls->GetProviderConsent(MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("RecordProviderConsent"), GoneAnswer<FCrowdyStudioConsent>([&Calls](TFunction<void(const FCrowdyStudioConsent&)> OnDone) { Calls->RecordProviderConsent(MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("GetModelUsage"), GoneAnswer<FCrowdyStudioModelUsage>([&Calls](TFunction<void(const FCrowdyStudioModelUsage&)> OnDone) { Calls->GetModelUsage(MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("AuthorizeLiveModding"), GoneAnswer<FCrowdyStudioLiveModding>([&Calls](TFunction<void(const FCrowdyStudioLiveModding&)> OnDone)
+	{
+		Calls->AuthorizeLiveModding(ECrowdyStudioRunMode::DraftTest, MoveTemp(OnDone));
+	}, Studio), Failed);
+	TestEqual(TEXT("RunProject"), GoneAnswer<FCrowdyModRun>([&Calls](TFunction<void(const FCrowdyModRun&)> OnDone)
+	{
+		Calls->RunProject(100, TEXT("p-1"), TEXT("rev-1"), ECrowdyStudioRunMode::DraftTest, TEXT("srv"), FString(), MoveTemp(OnDone));
+	}, Mods), Failed);
+	TestEqual(TEXT("ListProjects"), GoneAnswer<FCrowdyStudioProjectList>([&Calls](TFunction<void(const FCrowdyStudioProjectList&)> OnDone) { Calls->ListProjects(MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("GetProject"), GoneAnswer<FCrowdyStudioProjectInfo>([&Calls](TFunction<void(const FCrowdyStudioProjectInfo&)> OnDone) { Calls->GetProject(TEXT("p-1"), MoveTemp(OnDone)); }, Studio), Failed);
+	TestEqual(TEXT("CreateProject"), GoneAnswer<FCrowdyStudioProjectInfo>([&Calls](TFunction<void(const FCrowdyStudioProjectInfo&)> OnDone)
+	{
+		Calls->CreateProject(TEXT("Lantern"), ECrowdyStudioProjectKind::Paired, MoveTemp(OnDone));
+	}, Studio), Failed);
+	TestEqual(TEXT("GetProjectStatus"), GoneAnswer<FCrowdyModProjectStatus>([&Calls](TFunction<void(const FCrowdyModProjectStatus&)> OnDone) { Calls->GetProjectStatus(100, TEXT("p-1"), MoveTemp(OnDone)); }, Mods), Failed);
+	TestEqual(TEXT("GetModLogs"), GoneAnswer<FCrowdyModLogs>([&Calls](TFunction<void(const FCrowdyModLogs&)> OnDone) { Calls->GetModLogs(100, TEXT("srv"), 40, MoveTemp(OnDone)); }, Mods), Failed);
+	TestEqual(TEXT("ListMods"), GoneAnswer<FCrowdyModList>([&Calls](TFunction<void(const FCrowdyModList&)> OnDone) { Calls->ListMods(100, MoveTemp(OnDone)); }, Mods), Failed);
+	TestEqual(TEXT("GetScriptLog"), GoneAnswer<FCrowdyModScriptLog>([&Calls](TFunction<void(const FCrowdyModScriptLog&)> OnDone) { Calls->GetScriptLog(100, TEXT("m-1"), MoveTemp(OnDone)); }, Scripts), Failed);
+	TestEqual(TEXT("GetScriptStatus"), GoneAnswer<FCrowdyModScriptStatusList>([&Calls](TFunction<void(const FCrowdyModScriptStatusList&)> OnDone) { Calls->GetScriptStatus(100, MoveTemp(OnDone)); }, Scripts), Failed);
+	TestEqual(TEXT("FindClaimAt"), GoneAnswer<FCrowdyClaimSearch>([&Calls](TFunction<void(const FCrowdyClaimSearch&)> OnDone) { Calls->FindClaimAt(FInt64Vector(1, 2, 3), MoveTemp(OnDone)); }, Claims), Failed);
+	TestEqual(TEXT("ListGridChannels"), GoneAnswer<FCrowdyGridChannels>([&Calls](TFunction<void(const FCrowdyGridChannels&)> OnDone) { Calls->ListGridChannels(100, MoveTemp(OnDone)); }, Claims), Failed);
+	TestTrue(TEXT("no Mod Scripts run without the world's subsystem"), Calls->GetRunningScripts().IsEmpty());
+	TestTrue(TEXT("and no notice is given without the agent's"), Calls->GetConsentNotice().IsEmpty());
 	return true;
 }
 

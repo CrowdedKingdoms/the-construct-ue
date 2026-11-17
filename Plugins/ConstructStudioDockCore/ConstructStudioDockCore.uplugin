@@ -18,6 +18,14 @@
   ],
   "Plugins": [
     {
+      "Name": "ConstructPresence",
+      "Enabled": true
+    },
+    {
+      "Name": "ConstructShell",
+      "Enabled": true
+    },
+    {
       "Name": "CrowdySDK",
       "Enabled": true
     },
