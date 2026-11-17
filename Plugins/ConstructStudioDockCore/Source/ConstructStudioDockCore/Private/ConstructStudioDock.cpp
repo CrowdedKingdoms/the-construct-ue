@@ -4,6 +4,7 @@
 #include "ConstructStudioDockBridge.h"
 #include "ConstructStudioDockFrames.h"
 #include "ConstructStudioDockLog.h"
+#include "ConstructStudioDockPlatform.h"
 #include "ConstructStudioDockScheme.h"
 #include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
@@ -13,6 +14,7 @@
 #include "HAL/PlatformProcess.h"
 #include "IWebBrowserWindow.h"
 #include "InputCoreTypes.h"
+#include "Layout/WidgetPath.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "SWebBrowser.h"
@@ -90,17 +92,14 @@ public:
 		return FReply::Handled().SetUserFocus(AsShared(), EFocusCause::Mouse);
 	}
 
-	virtual FReply OnFocusReceived(const FGeometry& Geometry, const FFocusEvent& Event) override
+	// Called for focus anywhere under the slot, so focus inside the agent's page counts as the dock's.
+	virtual void OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& Event) override
 	{
-		FocusChanged(true);
-		return FReply::Handled();
+		SCompoundWidget::OnFocusChanging(PreviousFocusPath, NewWidgetPath, Event);
+		FocusChanged(NewWidgetPath.ContainsWidget(this));
 	}
 
-	virtual void OnFocusLost(const FFocusEvent& Event) override
-	{
-		FocusChanged(false);
-	}
-
+	// The browser hands back a key its page did not handle, so Escape inside the page reaches this too.
 	virtual FReply OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override
 	{
 		if (Event.GetKey() != EKeys::Escape)
@@ -157,6 +156,10 @@ EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText&
 	{
 		return EConstructStudioDockReason::NotAvailable;
 	}
+	if constexpr (!PLATFORM_WINDOWS)
+	{
+		return EConstructStudioDockReason::NotAvailable;
+	}
 #if UE_BUILD_SHIPPING
 	// A DevTools port would let any local process drive the page and read the player's token.
 	FString DebugPort;
@@ -183,11 +186,18 @@ EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText&
 	CurrentProjectId = ProjectId;
 	CurrentProjectName.Reset();
 	CurrentRevision.Reset();
+	CurrentServerModule.Reset();
+	CurrentClientModule.Reset();
 	bCurrentReachesVisitors = false;
 	bProjectRead = false;
+	bProjectReadInFlight = false;
+	bProjectDirty = false;
+	bUsageInFlight = false;
 	ChangedFiles.Reset();
 	Pending = FConstructStudioDeployPrompt();
 	ConsentNotice = FText::GetEmpty();
+	UsageAge = 0.0;
+	SaveQuietAge = 0.0;
 	bRunInFlight = false;
 	bBootReplayed = false;
 	bLiveBoot = false;
@@ -252,9 +262,13 @@ void UConstructStudioDock::Teardown()
 	State = EConstructStudioDockState::Closed;
 	bFocusReported = false;
 	bRunInFlight = false;
+	bProjectReadInFlight = false;
+	bProjectDirty = false;
+	bUsageInFlight = false;
 	PendingCaptures.Reset();
 	ReleasePage();
 	UnbindAgent();
+	Platform.Reset();
 	bLiveBoot = false;
 	StudioOrigin.Reset();
 	WalletUrl.Reset();
@@ -281,6 +295,22 @@ void UConstructStudioDock::SetGrid(int64 GridId, const FText& GridLabel)
 	CurrentGridId = GridId;
 	CurrentGridLabel = GridLabel;
 	Send(TEXT("SetGrid"), LexToString(GridId));
+	TellGridContext(Generation);
+}
+
+void UConstructStudioDock::TellGridContext(int64 InGeneration)
+{
+	const TSharedRef<FJsonObject> Context = MakeShared<FJsonObject>();
+	Context->SetObjectField(TEXT("grid"), GridContext());
+	TellAgent(InGeneration, TEXT("page.context"), Context);
+}
+
+TSharedRef<FJsonObject> UConstructStudioDock::GridContext() const
+{
+	const TSharedRef<FJsonObject> Grid = MakeShared<FJsonObject>();
+	Grid->SetStringField(TEXT("gridId"), LexToString(CurrentGridId));
+	Grid->SetStringField(TEXT("label"), CurrentGridLabel.ToString());
+	return Grid;
 }
 
 EConstructStudioDockState UConstructStudioDock::GetState() const
@@ -334,6 +364,19 @@ void UConstructStudioDock::GiveProviderConsent()
 	}
 	SetState(EConstructStudioDockState::Booting, EConstructStudioDockReason::None);
 	Send(TEXT("GiveProviderConsent"));
+	if (!bLiveBoot || !Platform.IsValid() || State != EConstructStudioDockState::Booting)
+	{
+		return;
+	}
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	const int64 Consenting = Generation;
+	Platform->RecordProviderConsent([Weak, Consenting](const FCrowdyStudioConsent& Consent)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveConsent(Consenting, Consent);
+		}
+	});
 }
 
 void UConstructStudioDock::AnswerDeployPrompt(int64 PromptId, bool bRun)
@@ -354,9 +397,57 @@ void UConstructStudioDock::AnswerDeployPrompt(int64 PromptId, bool bRun)
 		WithdrawPrompt(TEXT("Refused"));
 		return;
 	}
+	const FConstructStudioDeployPrompt Approved = Pending;
 	Pending = FConstructStudioDeployPrompt();
 	bRunInFlight = true;
 	Send(TEXT("AnswerDeployPrompt"), TEXT("Run"));
+	StartRun(Approved, PendingServerModule, PendingClientModule);
+}
+
+void UConstructStudioDock::StartRun(const FConstructStudioDeployPrompt& Approved, const FString& ServerModule, const FString& ClientModule)
+{
+	if (!bRunInFlight || !bLiveBoot || !Platform.IsValid())
+	{
+		return;
+	}
+	const ECrowdyStudioRunMode Mode = Approved.Kind == EConstructStudioDeployKind::Live ? ECrowdyStudioRunMode::Live : ECrowdyStudioRunMode::DraftTest;
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	const int64 Running = Generation;
+	// Neither RunProject nor the platform's build and deploy calls check the app's Allow Live Modding switch.
+	Platform->AuthorizeLiveModding(Mode, [Weak, Running, Approved, ServerModule, ClientModule](const FCrowdyStudioLiveModding& Verdict)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveLiveModding(Running, Approved, ServerModule, ClientModule, Verdict);
+		}
+	});
+}
+
+void UConstructStudioDock::ReceiveLiveModding(int64 InGeneration, const FConstructStudioDeployPrompt& Approved, const FString& ServerModule, const FString& ClientModule, const FCrowdyStudioLiveModding& Verdict)
+{
+	if (!IsCurrent(InGeneration) || !bRunInFlight || !Platform.IsValid())
+	{
+		return;
+	}
+	if (Verdict.Result != ECrowdyStudioResult::Success || !Verdict.bAllowed)
+	{
+		ReceiveRunAnswer(InGeneration, false);
+		return;
+	}
+	const ECrowdyStudioRunMode Mode = Approved.Kind == EConstructStudioDeployKind::Live ? ECrowdyStudioRunMode::Live : ECrowdyStudioRunMode::DraftTest;
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	Platform->RunProject(Approved.GridId, Approved.ProjectId, Approved.Revision, Mode, ServerModule, ClientModule, [Weak, InGeneration](const FCrowdyModRun& Run)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveModRun(InGeneration, Run);
+		}
+	});
+}
+
+void UConstructStudioDock::ReceiveModRun(int64 InGeneration, const FCrowdyModRun& Run)
+{
+	ReceiveRunAnswer(InGeneration, Run.Result == ECrowdyModResult::Success);
 }
 
 void UConstructStudioDock::OpenWallet()
@@ -494,6 +585,7 @@ void UConstructStudioDock::ReceiveBootOutcome(int64 InGeneration, EConstructStud
 	if (NewState == EConstructStudioDockState::Ready)
 	{
 		SetState(EConstructStudioDockState::Ready, EConstructStudioDockReason::None);
+		RequestUsage();
 	}
 }
 
@@ -540,8 +632,8 @@ void UConstructStudioDock::ReceiveDeployRequest(int64 InGeneration, EConstructSt
 		Send(Message, TEXT("refused: busy"));
 		return;
 	}
-	// A project id passed to Open is not enough: the prompt needs the revision the platform read for it.
-	if (!bProjectRead || CurrentRevision.IsEmpty())
+	// A project id passed to Open is not enough: the prompt needs the revision the platform read for it, after the last save.
+	if (!bProjectRead || CurrentRevision.IsEmpty() || bProjectDirty || bProjectReadInFlight)
 	{
 		Send(Message, TEXT("refused: no project"));
 		return;
@@ -555,6 +647,8 @@ void UConstructStudioDock::ReceiveDeployRequest(int64 InGeneration, EConstructSt
 	Pending.Revision = CurrentRevision;
 	Pending.bReachesVisitors = bCurrentReachesVisitors;
 	Pending.ChangedFiles = ChangedFiles;
+	PendingServerModule = CurrentServerModule;
+	PendingClientModule = CurrentClientModule;
 	PromptAge = 0.0;
 	const FConstructStudioDeployPrompt Shown = Pending;
 	OnDeployPrompt.Broadcast(Shown);
@@ -623,6 +717,17 @@ void UConstructStudioDock::CaptureAnswered(UConstructStudioCaptureRequest& Reque
 	Send(Message, Capture.bCaptured
 		? FString::Printf(TEXT("captured %dx%d"), Capture.Width, Capture.Height)
 		: FString::Printf(TEXT("refused: %s"), *Capture.Refusal));
+	if (!Request.bShared || !Capture.bCaptured || Capture.PngBase64.IsEmpty())
+	{
+		return;
+	}
+	const TSharedRef<FJsonObject> Shot = MakeShared<FJsonObject>();
+	Shot->SetStringField(TEXT("bytesBase64"), Capture.PngBase64);
+	Shot->SetStringField(TEXT("mediaType"), TEXT("image/png"));
+	Shot->SetNumberField(TEXT("width"), Capture.Width);
+	Shot->SetNumberField(TEXT("height"), Capture.Height);
+	Shot->SetStringField(TEXT("caption"), Capture.Caption);
+	TellAgent(Request.Generation, TEXT("page.capture"), Shot);
 }
 
 bool UConstructStudioDock::IsCurrent(int64 InGeneration) const
@@ -633,13 +738,8 @@ bool UConstructStudioDock::IsCurrent(int64 InGeneration) const
 bool UConstructStudioDock::Advance(float DeltaSeconds)
 {
 	const int64 Ticking = Generation;
-	bool bAccessEnded = false;
-	const int64 User = SignedInUser(bAccessEnded);
-	if (User != BootUser)
+	if (CloseIfPlayerChanged())
 	{
-		CloseFor(bAccessEnded ? EConstructStudioDockReason::AccessEnded
-			: User <= 0 ? EConstructStudioDockReason::SignedOut
-			: EConstructStudioDockReason::UserChanged);
 		return false;
 	}
 	if (State == EConstructStudioDockState::Booting && !bBootReplayed && !bLiveBoot)
@@ -656,6 +756,24 @@ bool UConstructStudioDock::Advance(float DeltaSeconds)
 			return IsCurrent(Ticking);
 		}
 	}
+	if (State == EConstructStudioDockState::Ready)
+	{
+		UsageAge += DeltaSeconds;
+		if (UsageAge >= UsageSeconds)
+		{
+			RequestUsage();
+		}
+	}
+	// The agent saves once per tool call, so a burst of saves is read back once, after it ends.
+	if (State == EConstructStudioDockState::Ready && bProjectDirty)
+	{
+		SaveQuietAge += DeltaSeconds;
+		if (SaveQuietAge >= SaveQuietSeconds && !bProjectReadInFlight)
+		{
+			bProjectDirty = false;
+			ReadProject();
+		}
+	}
 	if (Pending.PromptId != 0)
 	{
 		PromptAge += DeltaSeconds;
@@ -665,6 +783,58 @@ bool UConstructStudioDock::Advance(float DeltaSeconds)
 		}
 	}
 	return IsCurrent(Ticking);
+}
+
+bool UConstructStudioDock::CloseIfPlayerChanged()
+{
+	bool bAccessEnded = false;
+	const int64 User = SignedInUser(bAccessEnded);
+	if (User == BootUser)
+	{
+		return false;
+	}
+	CloseFor(bAccessEnded ? EConstructStudioDockReason::AccessEnded
+		: User <= 0 ? EConstructStudioDockReason::SignedOut
+		: EConstructStudioDockReason::UserChanged);
+	return true;
+}
+
+void UConstructStudioDock::RequestUsage()
+{
+	// The clock keeps running, so the tick after the answer reads again.
+	if (bUsageInFlight)
+	{
+		return;
+	}
+	UsageAge = 0.0;
+	if (State != EConstructStudioDockState::Ready || !bLiveBoot || !Platform.IsValid())
+	{
+		return;
+	}
+	bUsageInFlight = true;
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	const int64 Reading = Generation;
+	Platform->GetModelUsage([Weak, Reading](const FCrowdyStudioModelUsage& Usage)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveModelUsage(Reading, Usage);
+		}
+	});
+}
+
+void UConstructStudioDock::ReceiveModelUsage(int64 InGeneration, const FCrowdyStudioModelUsage& Usage)
+{
+	if (!IsCurrent(InGeneration))
+	{
+		return;
+	}
+	bUsageInFlight = false;
+	if (State != EConstructStudioDockState::Ready || Usage.Result != ECrowdyStudioResult::Success)
+	{
+		return;
+	}
+	ReceiveUsage(InGeneration, FConstructStudioDockPlatform::ToUsage(Usage));
 }
 
 void UConstructStudioDock::SetState(EConstructStudioDockState NewState, EConstructStudioDockReason NewReason, const FText& Text)
@@ -682,8 +852,12 @@ void UConstructStudioDock::Fail(EConstructStudioDockReason Why, const FText& Tex
 	WithdrawPrompt(TEXT("Refused"));
 	RefuseCaptures(TEXT("failed"));
 	bRunInFlight = false;
+	bProjectDirty = false;
+	bUsageInFlight = false;
 	if (IsCurrent(Failing))
 	{
+		// A failed dock keeps no page: the harness stops, the token is no longer sent and the failure text shows.
+		ReleasePage();
 		SetState(EConstructStudioDockState::Failed, Why, Text);
 	}
 }
@@ -783,7 +957,7 @@ bool UConstructStudioDock::PlaceholderHasFocus() const
 		return PlaceholderFocusForTests.GetValue();
 	}
 	const TSharedPtr<SConstructStudioDockPlaceholder> Pinned = Placeholder.Pin();
-	return Pinned.IsValid() && FSlateApplication::IsInitialized() && Pinned->HasAnyUserFocus().IsSet();
+	return Pinned.IsValid() && FSlateApplication::IsInitialized() && Pinned->HasAnyUserFocusOrFocusedDescendants();
 }
 
 void UConstructStudioDock::ClearPlaceholderFocus()
@@ -800,7 +974,7 @@ void UConstructStudioDock::ClearPlaceholderFocus()
 	}
 	FSlateApplication::Get().ForEachUser([&Pinned](FSlateUser& User)
 	{
-		if (User.HasFocus(Pinned).IsSet())
+		if (User.HasFocus(Pinned).IsSet() || User.HasFocusedDescendants(Pinned.ToSharedRef()))
 		{
 			FSlateApplication::Get().ClearUserFocus(User.GetUserIndex(), EFocusCause::Cleared);
 		}
@@ -818,22 +992,15 @@ FText UConstructStudioDock::PlaceholderText() const
 
 bool UConstructStudioDock::StartLiveBoot()
 {
-	UCrowdyStudioAgent* Agent = LiveAgent();
-	if (!Agent)
+	Platform = PlatformForTests.IsValid() ? PlatformForTests : LivePlatform();
+	if (!Platform.IsValid())
 	{
 		return false;
 	}
 	bLiveBoot = true;
-	if (BoundAgent.Get() != Agent)
-	{
-		UnbindAgent();
-		BoundAgent = Agent;
-		AgentTokenHandle = Agent->OnAgentTokenChanged.AddUObject(this, &UConstructStudioDock::AgentTokenChanged);
-		Agent->OnAgentBootChanged.AddDynamic(this, &UConstructStudioDock::AgentBootChanged);
-	}
 	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
 	const int64 Booting = Generation;
-	Agent->GetAgentBoot([Weak, Booting](const FCrowdyStudioAgentBoot& Boot)
+	Platform->GetAgentBoot([Weak, Booting](const FCrowdyStudioAgentBoot& Boot)
 	{
 		if (UConstructStudioDock* Dock = Weak.Get())
 		{
@@ -841,6 +1008,24 @@ bool UConstructStudioDock::StartLiveBoot()
 		}
 	});
 	return true;
+}
+
+TSharedPtr<FConstructStudioDockPlatform> UConstructStudioDock::LivePlatform()
+{
+	UCrowdyStudioAgent* Agent = LiveAgent();
+	UGameInstance* Game = Agent ? Agent->GetGameInstance() : nullptr;
+	if (!Game)
+	{
+		return nullptr;
+	}
+	if (BoundAgent.Get() != Agent)
+	{
+		UnbindAgent();
+		BoundAgent = Agent;
+		AgentTokenHandle = Agent->OnAgentTokenChanged.AddUObject(this, &UConstructStudioDock::AgentTokenChanged);
+		Agent->OnAgentBootChanged.AddDynamic(this, &UConstructStudioDock::AgentBootChanged);
+	}
+	return FConstructStudioDockPlatform::Live(*Game);
 }
 
 UCrowdyStudioAgent* UConstructStudioDock::LiveAgent() const
@@ -873,13 +1058,14 @@ void UConstructStudioDock::UnbindAgent()
 
 void UConstructStudioDock::ReceiveAgentBoot(int64 InGeneration, const FCrowdyStudioAgentBoot& Boot)
 {
-	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Booting || !bLiveBoot)
+	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Booting || !bLiveBoot || AgentBoot.IsValid() || !Platform.IsValid())
 	{
 		return;
 	}
+	// A refusal's message names its cause (no model, no permission, the agent turned off), which a player cannot fix by retrying.
 	if (Boot.Result != ECrowdyStudioResult::Success)
 	{
-		Fail(EConstructStudioDockReason::Unavailable, FText::GetEmpty());
+		Fail(EConstructStudioDockReason::Unavailable, FText::FromString(Boot.Message.Left(200)));
 		return;
 	}
 	if (Boot.Models.IsEmpty())
@@ -891,15 +1077,139 @@ void UConstructStudioDock::ReceiveAgentBoot(int64 InGeneration, const FCrowdyStu
 	StudioOrigin = ConstructStudioDockScheme::NormalizeOrigin(Boot.StudioOrigin);
 	WalletUrl = Boot.WalletUrl.StartsWith(TEXT("https://"), ESearchCase::IgnoreCase) ? Boot.WalletUrl : FString();
 	ConstructStudioDockScheme::SetConnectOrigins(Boot.ConnectOrigins);
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	Platform->GetProviderConsent([Weak, InGeneration](const FCrowdyStudioConsent& Consent)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveConsent(InGeneration, Consent);
+		}
+	});
+}
+
+void UConstructStudioDock::ReceiveConsent(int64 InGeneration, const FCrowdyStudioConsent& Consent)
+{
+	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Booting || !AgentBoot.IsValid() || Bridge || !Platform.IsValid())
+	{
+		return;
+	}
+	if (Consent.Result != ECrowdyStudioResult::Success)
+	{
+		Fail(EConstructStudioDockReason::Unavailable, FText::FromString(Consent.Message.Left(200)));
+		return;
+	}
+	if (!Consent.bConsented)
+	{
+		ConsentNotice = Platform->GetConsentNotice();
+		SetState(EConstructStudioDockState::NeedsConsent, EConstructStudioDockReason::NeedsConsent);
+		return;
+	}
+	ReadProject();
+}
+
+void UConstructStudioDock::ReadProject()
+{
+	if (!bLiveBoot || !Platform.IsValid())
+	{
+		return;
+	}
+	if (bProjectReadInFlight)
+	{
+		return;
+	}
+	bProjectReadInFlight = true;
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	const int64 Reading = Generation;
+	if (CurrentProjectId.IsEmpty())
+	{
+		Platform->ListProjects([Weak, Reading](const FCrowdyStudioProjectList& List)
+		{
+			if (UConstructStudioDock* Dock = Weak.Get())
+			{
+				Dock->ReceiveStudioProject(Reading, List.Result, List.Message, List.Projects.IsEmpty() ? FCrowdyStudioProject() : List.Projects[0]);
+			}
+		});
+		return;
+	}
+	Platform->GetProject(CurrentProjectId, [Weak, Reading](const FCrowdyStudioProjectInfo& Info)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveStudioProject(Reading, Info.Result, Info.Message, Info.Project);
+		}
+	});
+}
+
+void UConstructStudioDock::ReceiveStudioProject(int64 InGeneration, ECrowdyStudioResult Result, const FString& Message, const FCrowdyStudioProject& Project)
+{
+	if (!IsCurrent(InGeneration))
+	{
+		return;
+	}
+	bProjectReadInFlight = false;
+	// The boot's own read, before the page exists, decides which project the page opens.
+	const bool bBootRead = State == EConstructStudioDockState::Booting && !Bridge;
+	if (bBootRead && Result != ECrowdyStudioResult::Success)
+	{
+		Fail(EConstructStudioDockReason::Unavailable, FText::FromString(Message.Left(200)));
+		return;
+	}
+	const bool bApplies = bBootRead || Project.ProjectId.Equals(CurrentProjectId, ESearchCase::CaseSensitive);
+	if (Result == ECrowdyStudioResult::Success && bApplies && !Project.ProjectId.IsEmpty())
+	{
+		CurrentServerModule = Project.ServerModule;
+		CurrentClientModule = Project.ClientModule;
+		ReceiveProject(InGeneration, Project.ProjectId, Project.Name, Project.Revision, !Project.ClientModule.IsEmpty());
+	}
+	if (Pending.PromptId != 0 && !Pending.Revision.Equals(CurrentRevision, ESearchCase::CaseSensitive))
+	{
+		WithdrawPrompt(TEXT("Refused"));
+	}
+	if (bBootRead)
+	{
+		ShowPage();
+	}
+}
+
+void UConstructStudioDock::ShowPage()
+{
+	if (!IsCurrent(Generation) || State != EConstructStudioDockState::Booting || Bridge)
+	{
+		return;
+	}
 	Bridge = NewObject<UConstructStudioDockBridge>(this);
 	Bridge->Dock = this;
 	ShowBrowser();
 }
 
+void UConstructStudioDock::ReceiveWorkerFileChanged(int64 InGeneration, const FJsonObject& Payload)
+{
+	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Ready || !Payload.HasTypedField<EJson::String>(TEXT("path")))
+	{
+		return;
+	}
+	const FString Path = Payload.GetStringField(TEXT("path")).Left(256);
+	FString Target;
+	if (Payload.HasTypedField<EJson::String>(TEXT("target")))
+	{
+		Target = Payload.GetStringField(TEXT("target")).Left(16);
+	}
+	// The page's events are untrusted, so the list is capped at two full crates' files.
+	if (!Path.IsEmpty() && ChangedFiles.Num() < 2 * UCrowdyMods::MaxFiles)
+	{
+		ChangedFiles.AddUnique(Target.IsEmpty() ? Path : Target / Path);
+	}
+	if (!CurrentProjectId.IsEmpty())
+	{
+		bProjectDirty = true;
+		SaveQuietAge = 0.0;
+	}
+}
+
 void UConstructStudioDock::AgentTokenChanged(int64 UserId, const FString& Token)
 {
-	bool bAccessEnded = false;
-	if (State == EConstructStudioDockState::Closed || !Channel.IsValid() || UserId != BootUser || SignedInUser(bAccessEnded) != BootUser)
+	// A sign-out or another player's sign-in closes the dock at once, not on the next tick.
+	if (State == EConstructStudioDockState::Closed || CloseIfPlayerChanged() || !Channel.IsValid() || UserId != BootUser)
 	{
 		return;
 	}
@@ -922,6 +1232,9 @@ void UConstructStudioDock::AgentBootChanged()
 		return;
 	}
 	bRunInFlight = false;
+	bProjectReadInFlight = false;
+	bProjectDirty = false;
+	bUsageInFlight = false;
 	ReleasePage();
 	++Generation;
 	SetState(EConstructStudioDockState::Booting, EConstructStudioDockReason::None);
@@ -1029,10 +1342,20 @@ void UConstructStudioDock::ReceiveWorkerEvent(int64 InGeneration, const FString&
 	{
 		return;
 	}
-	// The worker re-sends ready until a page.hello reaches it.
+	// The worker sends ready when it starts and after each page.hello; the hello sent on joined may arrive before it starts.
 	if (Event.Equals(TEXT("worker.ready"), ESearchCase::CaseSensitive))
 	{
-		SendHello(InGeneration);
+		if (Channel.IsValid() && Channel->GreetReady(InGeneration))
+		{
+			SendHello(InGeneration);
+			TellGridContext(InGeneration);
+		}
+		return;
+	}
+	// The event names a saved file but not the project's new revision, which is read back from the platform.
+	if (Event.Equals(TEXT("worker.fileChanged"), ESearchCase::CaseSensitive) && Payload.IsValid())
+	{
+		ReceiveWorkerFileChanged(InGeneration, *Payload);
 		return;
 	}
 	FString Message;
@@ -1082,7 +1405,12 @@ void UConstructStudioDock::DeliverToPage(const FString& FrameJson)
 	{
 		return;
 	}
-	const FString Script = TEXT("window.constructStudioDock&&window.constructStudioDock.deliver(") + FrameJson + TEXT(");");
+	// A frame may carry a whole screenshot, so the script is built in one allocation.
+	FString Script;
+	Script.Reserve(FrameJson.Len() + 64);
+	Script += TEXT("window.constructStudioDock&&window.constructStudioDock.deliver(");
+	Script += FrameJson;
+	Script += TEXT(");");
 	if (ScriptsForTests)
 	{
 		ScriptsForTests(Script);

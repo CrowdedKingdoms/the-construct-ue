@@ -1,3 +1,4 @@
+using System.IO;
 using UnrealBuildTool;
 
 public class ConstructStudioDockCore : ModuleRules
@@ -26,5 +27,10 @@ public class ConstructStudioDockCore : ModuleRules
             "WebBrowser"
         });
         RuntimeDependencies.Add("$(PluginDir)/Resources/StudioDock/...", StagedFileType.NonUFS);
+        string HarnessBuild = Path.Combine(PluginDirectory, "Resources", "StudioDock", "dsh", "BUILD.json");
+        if (File.Exists(HarnessBuild))
+        {
+            ExternalDependencies.Add(HarnessBuild);
+        }
     }
 }

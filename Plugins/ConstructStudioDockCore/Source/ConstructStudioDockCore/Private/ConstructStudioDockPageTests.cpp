@@ -106,6 +106,9 @@ bool FConstructStudioDockSchemeHeadersTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the harness's worker-src"), Harness.Contains(TEXT("worker-src 'self' blob:")));
 	TestTrue(TEXT("the harness connects to the boot's origins only"), Harness.Contains(TEXT("connect-src 'self' blob: https://api.example.test;")));
 	TestTrue(TEXT("only the page frames the harness"), Harness.Contains(TEXT("frame-ancestors 'self'")));
+	TestTrue(TEXT("every other load stays on the dock's origin"), Harness.StartsWith(TEXT("default-src 'self';")));
+	TestTrue(TEXT("the agent's markdown images cannot reach another host"), Harness.Contains(TEXT("img-src 'self' data: blob:;")));
+	TestTrue(TEXT("no plugin or base rewrite"), Harness.Contains(TEXT("object-src 'none'")) && Harness.Contains(TEXT("base-uri 'none'")));
 	const FString Bare = HeaderValue(ConstructStudioDockScheme::HeadersFor(TEXT("dsh/index.html"), TArray<FString>()), TEXT("Content-Security-Policy"));
 	TestTrue(TEXT("with no boot the harness connects nowhere else"), Bare.Contains(TEXT("connect-src 'self' blob:;")));
 
@@ -229,6 +232,23 @@ bool FConstructStudioDockFrameChecksTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockGreetReadyTest, "Construct.StudioDock.Page.ReadyAndHelloEndAfterOneExchange", ConstructStudioDockPageTests::PageTestFlags)
+bool FConstructStudioDockGreetReadyTest::RunTest(const FString& Parameters)
+{
+	FConstructStudioDockChannel Channel([](const FString&) {});
+	Channel.Begin(1, TEXT("nonce-1"));
+	TestFalse(TEXT("a ready before the page joins is not greeted"), Channel.GreetReady(1));
+	Channel.SetPageJoined(1);
+	TestFalse(TEXT("a ready from an older boot is not greeted"), Channel.GreetReady(2));
+	TestTrue(TEXT("the worker's first ready is greeted"), Channel.GreetReady(1));
+	TestFalse(TEXT("the ready that answers that hello is not"), Channel.GreetReady(1));
+	TestTrue(TEXT("a restarted worker's ready is greeted again"), Channel.GreetReady(1));
+	Channel.Begin(2, TEXT("nonce-2"));
+	Channel.SetPageJoined(2);
+	TestTrue(TEXT("a new boot greets its worker's first ready"), Channel.GreetReady(2));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockFrameGenerationTest, "Construct.StudioDock.Page.LateAnswerFromAnOlderBootIsDropped", ConstructStudioDockPageTests::PageTestFlags)
 bool FConstructStudioDockFrameGenerationTest::RunTest(const FString& Parameters)
 {
@@ -290,6 +310,28 @@ bool FConstructStudioDockTokenFramesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockFailReleasesPageTest, "Construct.StudioDock.Page.FailedDockKeepsNoPage", ConstructStudioDockPageTests::PageTestFlags)
+bool FConstructStudioDockFailReleasesPageTest::RunTest(const FString& Parameters)
+{
+	using namespace ConstructStudioDockPageTests;
+	using FAccess = FConstructStudioDockTestAccess;
+	FConstructStudioDockTestRig Rig;
+	Rig.Open();
+	FAccess::BootLive(*Rig.Dock, AgentBoot());
+	const TStrongObjectPtr<UConstructStudioDockBridge> Bridge(FAccess::Bridge(*Rig.Dock));
+	if (!TestTrue(TEXT("the boot material makes a bridge"), Bridge.IsValid()))
+	{
+		return false;
+	}
+	// On the dock's origin a bridge still bound would answer the boot material, not an error.
+	FAccess::SetMainFrame(*Rig.Dock, ConstructStudioDockScheme::PageUrl);
+	FAccess::Advance(*Rig.Dock, 61.f);
+	TestTrue(TEXT("a harness that never boots fails the dock"), Rig.Dock->GetState() == EConstructStudioDockState::Failed);
+	TestNull(TEXT("and the failed dock keeps no page"), FAccess::Bridge(*Rig.Dock));
+	TestEqual(TEXT("so the old page's bridge answers closed"), Bridge->Boot(), ConstructStudioDockFrames::ErrorReply(TEXT("closed")));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockBridgeOriginTest, "Construct.StudioDock.Page.BridgeAnswersOnlyOnTheDockOrigin", ConstructStudioDockPageTests::PageTestFlags)
 bool FConstructStudioDockBridgeOriginTest::RunTest(const FString& Parameters)
 {
@@ -342,24 +384,26 @@ bool FConstructStudioDockBridgeOriginTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a request answered later is refused as not offered yet"), Scripts.Num() == 3 && Scripts[1].Contains(TEXT("\"code\":\"BRIDGE_UNAVAILABLE\"")) && Scripts[1].Contains(TEXT("\"id\":\"1\"")));
 	TestTrue(TEXT("a grid program request is refused as not offered"), Scripts.Num() == 3 && Scripts[2].Contains(TEXT("\"code\":\"BRIDGE_REFUSED\"")) && Scripts[2].Contains(TEXT("\"id\":\"2\"")));
 	Bridge->Send(WorkerEvent(Nonce, TEXT("worker.ready")));
-	TestEqual(TEXT("worker.ready sends page.hello again"), Scripts.Num(), 4);
+	TestEqual(TEXT("worker.ready sends page.hello again, then the grid's context"), Scripts.Num(), 5);
+	Bridge->Send(WorkerEvent(Nonce, TEXT("worker.ready")));
+	TestEqual(TEXT("the worker.ready that answers that hello sends nothing"), Scripts.Num(), 5);
 	FAccess::TokenChanged(*Rig.Dock, 42, TEXT("tok-secret-2"));
 	FAccess::TokenChanged(*Rig.Dock, 7, TEXT("tok-secret-other"));
-	TestEqual(TEXT("a new token for the booted user goes out, another user's does not"), Scripts.Num(), 5);
+	TestEqual(TEXT("a new token for the booted user goes out, another user's does not"), Scripts.Num(), 6);
 	TestFalse(TEXT("a late answer from an older boot is dropped"), FAccess::Reply(*Rig.Dock, FAccess::Generation(*Rig.Dock) - 1, TEXT("1"), MakeShared<FJsonObject>()));
 
 	FAccess::SetMainFrame(*Rig.Dock, TEXT("https://evil.example.test/index.html"));
 	TestTrue(TEXT("send() off the dock's origin answers an error"), Bridge->Send(WorkerEvent(Nonce, TEXT("worker.ready"))).Contains(TEXT("\"error\"")));
 	FAccess::Reply(*Rig.Dock, FAccess::Generation(*Rig.Dock), TEXT("4"), MakeShared<FJsonObject>());
-	TestEqual(TEXT("no script runs in a page off the dock's origin"), Scripts.Num(), 5);
+	TestEqual(TEXT("no script runs in a page off the dock's origin"), Scripts.Num(), 6);
 	FAccess::SetMainFrame(*Rig.Dock, ConstructStudioDockScheme::PageUrl);
 
 	Rig.Dock->Close();
-	TestEqual(TEXT("Close says page.bye"), Scripts.Num(), 6);
-	TestTrue(TEXT("as the last frame"), Scripts.Num() == 6 && Scripts[5].Contains(TEXT("\"event\":\"page.bye\"")));
+	TestEqual(TEXT("Close says page.bye"), Scripts.Num(), 7);
+	TestTrue(TEXT("as the last frame"), Scripts.Num() == 7 && Scripts[6].Contains(TEXT("\"event\":\"page.bye\"")));
 	TestTrue(TEXT("boot() after Close answers an error"), Bridge->Boot().Contains(TEXT("\"error\"")));
 	TestTrue(TEXT("send() after Close answers an error"), Bridge->Send(WorkerEvent(Nonce, TEXT("worker.ready"))).Contains(TEXT("\"error\"")));
-	TestEqual(TEXT("and reaches nothing"), Scripts.Num(), 6);
+	TestEqual(TEXT("and reaches nothing"), Scripts.Num(), 7);
 
 	for (const FString& Script : Scripts)
 	{
@@ -368,7 +412,7 @@ bool FConstructStudioDockBridgeOriginTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("only page.hello and page.token carry the token"), !bCarriesToken || bTokenFrame);
 	}
 	TestTrue(TEXT("page.hello carried it"), Scripts.Num() > 0 && Scripts[0].Contains(Token));
-	TestTrue(TEXT("page.token carried the new one"), Scripts.Num() > 4 && Scripts[4].Contains(TEXT("tok-secret-2")));
+	TestTrue(TEXT("page.token carried the new one"), Scripts.Num() > 5 && Scripts[5].Contains(TEXT("tok-secret-2")));
 	return true;
 }
 

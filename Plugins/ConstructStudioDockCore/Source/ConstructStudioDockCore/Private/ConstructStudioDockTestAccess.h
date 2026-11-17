@@ -4,6 +4,7 @@
 
 #include "ConstructStudioDock.h"
 #include "ConstructStudioDockBridge.h"
+#include "ConstructStudioDockPlatform.h"
 #include "ConstructStudioDockTestListener.h"
 #include "Dom/JsonObject.h"
 #include "Subsystem/CrowdyStudioAgent.h"
@@ -89,11 +90,46 @@ struct FConstructStudioDockTestAccess
 		Dock.ReceiveCloseRequest(Dock.Generation);
 	}
 
-	/** Stands in for the SDK's boot material arriving for a dock whose page can run. */
+	/** Stands in for the SDK's boot material arriving for a dock whose page can run, with consent given and no project. */
 	static void BootLive(UConstructStudioDock& Dock, const FCrowdyStudioAgentBoot& Boot)
 	{
+		if (!Dock.PlatformForTests.IsValid())
+		{
+			const TSharedRef<FConstructStudioDockPlatform> AtOnce = MakeShared<FConstructStudioDockPlatform>();
+			AtOnce->GetProviderConsent = [](TFunction<void(const FCrowdyStudioConsent&)> OnDone)
+			{
+				FCrowdyStudioConsent Consent;
+				Consent.Result = ECrowdyStudioResult::Success;
+				Consent.bConsented = true;
+				OnDone(Consent);
+			};
+			AtOnce->ListProjects = [](TFunction<void(const FCrowdyStudioProjectList&)> OnDone)
+			{
+				FCrowdyStudioProjectList List;
+				List.Result = ECrowdyStudioResult::Success;
+				OnDone(List);
+			};
+			Dock.PlatformForTests = AtOnce;
+		}
+		Dock.Platform = Dock.PlatformForTests;
 		Dock.bLiveBoot = true;
 		Dock.ReceiveAgentBoot(Dock.Generation, Boot);
+	}
+
+	/** Answers the dock's SDK calls from the test from the next Open on; the dock never reaches the real SDK while set. */
+	static void UsePlatform(UConstructStudioDock& Dock, const TSharedRef<FConstructStudioDockPlatform>& Calls)
+	{
+		Dock.PlatformForTests = Calls;
+	}
+
+	static void WorkerEvent(UConstructStudioDock& Dock, const FString& Event, const TSharedRef<FJsonObject>& Payload)
+	{
+		Dock.ReceiveWorkerEvent(Dock.Generation, Event, Payload);
+	}
+
+	static int32 ChangedFileCount(const UConstructStudioDock& Dock)
+	{
+		return Dock.ChangedFiles.Num();
 	}
 
 	static UConstructStudioDockBridge* Bridge(const UConstructStudioDock& Dock)

@@ -96,7 +96,7 @@ struct CONSTRUCTSTUDIODOCKCORE_API FConstructStudioUsage
 	UPROPERTY(BlueprintReadWrite, Category="Construct|Studio Dock")
 	FString TodayCharge;
 
-	/** The day's limit as a decimal string; empty when there is none. */
+	/** Today's spend ceiling as a decimal string. */
 	UPROPERTY(BlueprintReadWrite, Category="Construct|Studio Dock")
 	FString DayLimit;
 };

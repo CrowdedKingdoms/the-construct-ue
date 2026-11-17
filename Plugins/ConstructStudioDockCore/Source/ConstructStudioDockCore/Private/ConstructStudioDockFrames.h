@@ -95,6 +95,10 @@ public:
 	void SetPageJoined(int64 InGeneration);
 
 	bool HasPageJoined() const;
+
+	/** True when a worker.ready should be greeted with page.hello; false when it only answers the hello sent for the previous one. */
+	bool GreetReady(int64 InGeneration);
+
 	int64 GetGeneration() const;
 	const FString& GetNonce() const;
 
@@ -121,4 +125,5 @@ private:
 	FString Nonce;
 	int64 Generation = 0;
 	bool bPageJoined = false;
+	bool bReadyGreeted = false;
 };
