@@ -6,12 +6,20 @@
 #include "ConstructStudioDockTypes.h"
 #include "ConstructStudioDock.generated.h"
 
+class FConstructStudioDockChannel;
+class FJsonObject;
 class SConstructStudioDockPlaceholder;
+class SWebBrowser;
 class UConstructStudioCaptureRequest;
+class UConstructStudioDockBridge;
+class UCrowdyStudioAgent;
+enum class EConstructStudioDockRefusal : uint8;
+struct FCrowdyStudioAgentBoot;
+struct FWebNavigationRequest;
 
 /**
- * The Studio dock: the platform's agent beside the game view, in the slot the panel gives it. This build has no agent
- * page yet, so a boot ends in Failed with NotBuiltYet; the refusals, generations, prompt and close rules all hold.
+ * The Studio dock: the platform's agent beside the game view, in the slot the panel gives it. Where the agent's page
+ * cannot run (no web browser in this process, or the page is not staged), a boot ends in Failed with NotBuiltYet.
  */
 UCLASS(meta=(DisplayName="Studio Dock"))
 class CONSTRUCTSTUDIODOCKCORE_API UConstructStudioDock : public UWidget
@@ -114,6 +122,7 @@ protected:
 
 private:
 	friend class UConstructStudioCaptureRequest;
+	friend class UConstructStudioDockBridge;
 	friend struct FConstructStudioDockTestAccess;
 	// The stand-in replays recorded agent traffic through Outbound and the Receive functions; nothing else reaches them.
 	friend class UStandInC11;
@@ -153,6 +162,40 @@ private:
 	void ClearPlaceholderFocus();
 	FText PlaceholderText() const;
 
+	bool StartLiveBoot();
+	UCrowdyStudioAgent* LiveAgent() const;
+	void UnbindAgent();
+	void ReceiveAgentBoot(int64 InGeneration, const FCrowdyStudioAgentBoot& Boot);
+	void AgentTokenChanged(int64 UserId, const FString& Token);
+	UFUNCTION()
+	void AgentBootChanged();
+	FString AgentToken() const;
+
+	FString BridgeBoot(const UConstructStudioDockBridge& Caller);
+	FString BridgeSend(const UConstructStudioDockBridge& Caller, const FString& Frame);
+	void ReceivePageFrame(const FString& Json);
+	void ReceivePageNotice(int64 InGeneration, const FString& Notice, const TSharedPtr<FJsonObject>& Payload);
+	void ReceiveWorkerEvent(int64 InGeneration, const FString& Event, const TSharedPtr<FJsonObject>& Payload);
+
+	/** One request from the agent, by method and id, with its params when they are an object; answer it once. */
+	void ReceiveAgentRequest(int64 InGeneration, const FString& Method, const FString& Id, const TSharedPtr<FJsonObject>& Params);
+
+	/** Answers a request; false, and nothing sent, when InGeneration is not the current boot or the page has not joined. */
+	bool ReplyToAgent(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result);
+	bool RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why);
+
+	/** Sends a page event other than page.hello and page.token; a screenshot travels as bytesBase64, which the page turns into bytes. */
+	bool TellAgent(int64 InGeneration, const FString& Event, const TSharedRef<FJsonObject>& Payload);
+
+	void SendHello(int64 InGeneration);
+	void DeliverToPage(const FString& FrameJson);
+	bool IsMainFrameOnOrigin() const;
+	void ShowBrowser();
+	void BindBridge();
+	void ReleasePage();
+	bool BrowserNavigating(const FString& Url, const FWebNavigationRequest& Request);
+	bool BrowserPopup(FString Url, FString Frame);
+
 	EConstructStudioDockState State = EConstructStudioDockState::Closed;
 	EConstructStudioDockReason Reason = EConstructStudioDockReason::None;
 	FText ReasonText;
@@ -185,4 +228,20 @@ private:
 	FDelegateHandle WorldCleanupHandle;
 	// Weak, as UWidget holds MyWidget: the slot the panel gives the dock owns its Slate widget.
 	TWeakPtr<SConstructStudioDockPlaceholder> Placeholder;
+
+	/** The page's object, made for each boot and bound for each load of the page; never this widget. */
+	UPROPERTY(Transient)
+	TObjectPtr<UConstructStudioDockBridge> Bridge;
+
+	TSharedPtr<FConstructStudioDockChannel> Channel;
+	TSharedPtr<const FCrowdyStudioAgentBoot> AgentBoot;
+	TSharedPtr<SWebBrowser> Browser;
+	TWeakObjectPtr<UCrowdyStudioAgent> BoundAgent;
+	FDelegateHandle AgentTokenHandle;
+	FString StudioOrigin;
+	FString WalletUrl;
+	bool bLiveBoot = false;
+	TOptional<FString> MainFrameUrlForTests;
+	TOptional<FString> TokenForTests;
+	TFunction<void(const FString&)> ScriptsForTests;
 };

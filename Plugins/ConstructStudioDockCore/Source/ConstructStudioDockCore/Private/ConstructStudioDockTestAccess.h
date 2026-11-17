@@ -3,7 +3,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "ConstructStudioDock.h"
+#include "ConstructStudioDockBridge.h"
 #include "ConstructStudioDockTestListener.h"
+#include "Dom/JsonObject.h"
+#include "Subsystem/CrowdyStudioAgent.h"
 #include "UObject/StrongObjectPtr.h"
 
 /** Reaches the dock's inbound side and clock from tests, so they need neither a signed-in player nor the stand-in. */
@@ -84,6 +87,45 @@ struct FConstructStudioDockTestAccess
 	static void CloseRequest(UConstructStudioDock& Dock)
 	{
 		Dock.ReceiveCloseRequest(Dock.Generation);
+	}
+
+	/** Stands in for the SDK's boot material arriving for a dock whose page can run. */
+	static void BootLive(UConstructStudioDock& Dock, const FCrowdyStudioAgentBoot& Boot)
+	{
+		Dock.bLiveBoot = true;
+		Dock.ReceiveAgentBoot(Dock.Generation, Boot);
+	}
+
+	static UConstructStudioDockBridge* Bridge(const UConstructStudioDock& Dock)
+	{
+		return Dock.Bridge.Get();
+	}
+
+	/** Stands in for the browser's main frame URL, which needs a live browser. */
+	static void SetMainFrame(UConstructStudioDock& Dock, const FString& Url)
+	{
+		Dock.MainFrameUrlForTests = Url;
+	}
+
+	static void SetToken(UConstructStudioDock& Dock, const FString& Token)
+	{
+		Dock.TokenForTests = Token;
+	}
+
+	/** Receives each script the dock would run in its page instead of the browser. */
+	static void CaptureScripts(UConstructStudioDock& Dock, TFunction<void(const FString&)> Capture)
+	{
+		Dock.ScriptsForTests = MoveTemp(Capture);
+	}
+
+	static void TokenChanged(UConstructStudioDock& Dock, int64 UserId, const FString& Token)
+	{
+		Dock.AgentTokenChanged(UserId, Token);
+	}
+
+	static bool Reply(UConstructStudioDock& Dock, int64 Generation, const FString& Id, const TSharedRef<FJsonObject>& Result)
+	{
+		return Dock.ReplyToAgent(Generation, Id, Result);
 	}
 
 	static FDelegateHandle ListenOutbound(TFunction<void(UConstructStudioDock&, FName, const FString&)> Listener)
