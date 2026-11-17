@@ -20,6 +20,10 @@
     {
       "Name": "CrowdySDK",
       "Enabled": true
+    },
+    {
+      "Name": "WebBrowserWidget",
+      "Enabled": true
     }
   ]
 }

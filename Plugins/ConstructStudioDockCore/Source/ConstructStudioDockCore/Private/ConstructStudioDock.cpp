@@ -1,22 +1,31 @@
 #include "ConstructStudioDock.h"
 
 #include "ConstructStudioCaptureRequest.h"
+#include "ConstructStudioDockBridge.h"
+#include "ConstructStudioDockFrames.h"
+#include "ConstructStudioDockLog.h"
+#include "ConstructStudioDockScheme.h"
+#include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
+#include "HAL/PlatformProcess.h"
+#include "IWebBrowserWindow.h"
 #include "InputCoreTypes.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "SWebBrowser.h"
 #include "Subsystem/CrowdyAuthentication.h"
 #include "Subsystem/CrowdyGameSession.h"
+#include "Subsystem/CrowdyStudioAgent.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "ConstructStudioDock"
 
-/** The dock's slot until the agent's page draws there: takes keyboard focus on a click, reports Escape and its own end. */
+/** The dock's slot: the agent's page once it boots, a line of text before. Takes keyboard focus on a click, reports Escape and its own end. */
 class SConstructStudioDockPlaceholder final : public SCompoundWidget
 {
 public:
@@ -37,6 +46,12 @@ public:
 		FocusChanged = MoveTemp(InFocusChanged);
 		Escape = MoveTemp(InEscape);
 		Destroyed = MoveTemp(InDestroyed);
+		Text = InArgs._Text;
+		ShowText();
+	}
+
+	void ShowText()
+	{
 		ChildSlot
 		[
 			SNew(SBorder)
@@ -45,9 +60,17 @@ public:
 			.VAlign(VAlign_Center)
 			[
 				SNew(STextBlock)
-				.Text(InArgs._Text)
+				.Text(Text)
 				.AutoWrapText(true)
 			]
+		];
+	}
+
+	void ShowContent(const TSharedRef<SWidget>& Content)
+	{
+		ChildSlot
+		[
+			Content
 		];
 	}
 
@@ -92,6 +115,7 @@ private:
 	TFunction<void(bool)> FocusChanged;
 	TFunction<void()> Escape;
 	TFunction<void()> Destroyed;
+	TAttribute<FText> Text;
 };
 
 TMulticastDelegate<void(UConstructStudioDock&, FName, const FString&)> UConstructStudioDock::Outbound;
@@ -109,6 +133,18 @@ void UConstructStudioCaptureRequest::Done(const FConstructStudioCapture& Capture
 	{
 		Owner->CaptureAnswered(*this, Capture);
 	}
+}
+
+FString UConstructStudioDockBridge::Boot()
+{
+	UConstructStudioDock* Owner = Dock.Get();
+	return Owner ? Owner->BridgeBoot(*this) : ConstructStudioDockFrames::ErrorReply(TEXT("closed"));
+}
+
+FString UConstructStudioDockBridge::Send(const FString& Frame)
+{
+	UConstructStudioDock* Owner = Dock.Get();
+	return Owner ? Owner->BridgeSend(*this, Frame) : ConstructStudioDockFrames::ErrorReply(TEXT("closed"));
 }
 
 EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText& GridLabel, const FString& ProjectId)
@@ -154,12 +190,22 @@ EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText&
 	ConsentNotice = FText::GetEmpty();
 	bRunInFlight = false;
 	bBootReplayed = false;
+	bLiveBoot = false;
 	bFocusReported = false;
+	if (!Channel.IsValid())
+	{
+		Channel = MakeShared<FConstructStudioDockChannel>([this](const FString& FrameJson) { DeliverToPage(FrameJson); });
+	}
 	OpenDock = this;
 	Ticker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UConstructStudioDock::Advance));
 	WorldCleanupHandle = FWorldDelegates::OnWorldCleanup.AddUObject(this, &UConstructStudioDock::WorldCleanup);
 	SetState(EConstructStudioDockState::Booting, EConstructStudioDockReason::None);
 	Send(TEXT("Open"), LexToString(GridId));
+	// A stand-in that claimed the boot while hearing Open replays it instead.
+	if (!bBootReplayed && State == EConstructStudioDockState::Booting)
+	{
+		StartLiveBoot();
+	}
 	// Slate sends no focus event for focus the slot already held while the dock was closed.
 	if (PlaceholderHasFocus())
 	{
@@ -183,6 +229,7 @@ void UConstructStudioDock::CloseFor(EConstructStudioDockReason Why)
 	const bool bHadFocus = bFocusReported;
 	Pending = FConstructStudioDeployPrompt();
 	RefuseCaptures(TEXT("closed"));
+	TellAgent(Generation, TEXT("page.bye"), MakeShared<FJsonObject>());
 	Teardown();
 	ClearPlaceholderFocus();
 	Reason = Why;
@@ -206,6 +253,11 @@ void UConstructStudioDock::Teardown()
 	bFocusReported = false;
 	bRunInFlight = false;
 	PendingCaptures.Reset();
+	ReleasePage();
+	UnbindAgent();
+	bLiveBoot = false;
+	StudioOrigin.Reset();
+	WalletUrl.Reset();
 	FTSTicker::RemoveTicker(Ticker);
 	Ticker.Reset();
 	FWorldDelegates::OnWorldCleanup.Remove(WorldCleanupHandle);
@@ -313,8 +365,14 @@ void UConstructStudioDock::OpenWallet()
 	{
 		return;
 	}
-	// The wallet URL arrives with the agent's boot material, which this build does not read yet.
-	Send(TEXT("OpenWallet"), TEXT("no wallet URL"));
+	// Only the wallet URL the platform gave with the boot, never one from the page.
+	if (WalletUrl.IsEmpty())
+	{
+		Send(TEXT("OpenWallet"), TEXT("no wallet URL"));
+		return;
+	}
+	FPlatformProcess::LaunchURL(*WalletUrl, nullptr, nullptr);
+	Send(TEXT("OpenWallet"), TEXT("opened"));
 }
 
 void UConstructStudioDock::ShareScreenshot()
@@ -346,6 +404,8 @@ void UConstructStudioDock::ReleaseSlateResources(bool bReleaseChildren)
 	}
 	Placeholder.Reset();
 	SlateWidgetGone();
+	// The page never outlives its slot, whether or not the dock closed with it.
+	ReleasePage();
 }
 
 void UConstructStudioDock::BeginDestroy()
@@ -395,6 +455,7 @@ TSharedRef<SWidget> UConstructStudioDock::RebuildWidget()
 			return Dock ? Dock->PlaceholderText() : FText::GetEmpty();
 		});
 	Placeholder = Built;
+	ShowBrowser();
 	return Built;
 }
 
@@ -581,7 +642,7 @@ bool UConstructStudioDock::Advance(float DeltaSeconds)
 			: EConstructStudioDockReason::UserChanged);
 		return false;
 	}
-	if (State == EConstructStudioDockState::Booting && !bBootReplayed)
+	if (State == EConstructStudioDockState::Booting && !bBootReplayed && !bLiveBoot)
 	{
 		Fail(EConstructStudioDockReason::NotBuiltYet, FText::GetEmpty());
 		return IsCurrent(Ticking);
@@ -753,6 +814,374 @@ FText UConstructStudioDock::PlaceholderText() const
 		return ReasonText;
 	}
 	return FText::Format(LOCTEXT("Placeholder", "The Studio dock is not ready yet ({0})."), UEnum::GetDisplayValueAsText(State));
+}
+
+bool UConstructStudioDock::StartLiveBoot()
+{
+	UCrowdyStudioAgent* Agent = LiveAgent();
+	if (!Agent)
+	{
+		return false;
+	}
+	bLiveBoot = true;
+	if (BoundAgent.Get() != Agent)
+	{
+		UnbindAgent();
+		BoundAgent = Agent;
+		AgentTokenHandle = Agent->OnAgentTokenChanged.AddUObject(this, &UConstructStudioDock::AgentTokenChanged);
+		Agent->OnAgentBootChanged.AddDynamic(this, &UConstructStudioDock::AgentBootChanged);
+	}
+	const TWeakObjectPtr<UConstructStudioDock> Weak(this);
+	const int64 Booting = Generation;
+	Agent->GetAgentBoot([Weak, Booting](const FCrowdyStudioAgentBoot& Boot)
+	{
+		if (UConstructStudioDock* Dock = Weak.Get())
+		{
+			Dock->ReceiveAgentBoot(Booting, Boot);
+		}
+	});
+	return true;
+}
+
+UCrowdyStudioAgent* UConstructStudioDock::LiveAgent() const
+{
+	if (UserForTests.IsSet() || !ConstructStudioDockScheme::IsRegistered())
+	{
+		return nullptr;
+	}
+	const UWorld* World = GetWorld();
+	const UGameInstance* Game = World ? World->GetGameInstance() : nullptr;
+	UCrowdyStudioAgent* Agent = Game ? Game->GetSubsystem<UCrowdyStudioAgent>() : nullptr;
+	if (Agent && !ConstructStudioDockScheme::IsStaged())
+	{
+		UE_LOG(LogConstructStudioDock, Warning, TEXT("The Studio dock's page or harness is missing from %s."), *ConstructStudioDockScheme::ServedRoot());
+		return nullptr;
+	}
+	return Agent;
+}
+
+void UConstructStudioDock::UnbindAgent()
+{
+	if (UCrowdyStudioAgent* Agent = BoundAgent.Get())
+	{
+		Agent->OnAgentTokenChanged.Remove(AgentTokenHandle);
+		Agent->OnAgentBootChanged.RemoveDynamic(this, &UConstructStudioDock::AgentBootChanged);
+	}
+	BoundAgent.Reset();
+	AgentTokenHandle.Reset();
+}
+
+void UConstructStudioDock::ReceiveAgentBoot(int64 InGeneration, const FCrowdyStudioAgentBoot& Boot)
+{
+	if (!IsCurrent(InGeneration) || State != EConstructStudioDockState::Booting || !bLiveBoot)
+	{
+		return;
+	}
+	if (Boot.Result != ECrowdyStudioResult::Success)
+	{
+		Fail(EConstructStudioDockReason::Unavailable, FText::GetEmpty());
+		return;
+	}
+	if (Boot.Models.IsEmpty())
+	{
+		Fail(EConstructStudioDockReason::NoModel, FText::GetEmpty());
+		return;
+	}
+	AgentBoot = MakeShared<FCrowdyStudioAgentBoot>(Boot);
+	StudioOrigin = ConstructStudioDockScheme::NormalizeOrigin(Boot.StudioOrigin);
+	WalletUrl = Boot.WalletUrl.StartsWith(TEXT("https://"), ESearchCase::IgnoreCase) ? Boot.WalletUrl : FString();
+	ConstructStudioDockScheme::SetConnectOrigins(Boot.ConnectOrigins);
+	Bridge = NewObject<UConstructStudioDockBridge>(this);
+	Bridge->Dock = this;
+	ShowBrowser();
+}
+
+void UConstructStudioDock::AgentTokenChanged(int64 UserId, const FString& Token)
+{
+	bool bAccessEnded = false;
+	if (State == EConstructStudioDockState::Closed || !Channel.IsValid() || UserId != BootUser || SignedInUser(bAccessEnded) != BootUser)
+	{
+		return;
+	}
+	Channel->Token(Generation, Token);
+}
+
+void UConstructStudioDock::AgentBootChanged()
+{
+	// Before the material arrives, the read in flight already carries the new addresses.
+	if (!bLiveBoot || !AgentBoot.IsValid() || State == EConstructStudioDockState::Closed || State == EConstructStudioDockState::Failed)
+	{
+		return;
+	}
+	const int64 Restarting = Generation;
+	TellAgent(Generation, TEXT("page.bye"), MakeShared<FJsonObject>());
+	WithdrawPrompt(TEXT("Refused"));
+	RefuseCaptures(TEXT("restarted"));
+	if (!IsCurrent(Restarting))
+	{
+		return;
+	}
+	bRunInFlight = false;
+	ReleasePage();
+	++Generation;
+	SetState(EConstructStudioDockState::Booting, EConstructStudioDockReason::None);
+	if (IsCurrent(Generation) && !StartLiveBoot())
+	{
+		Fail(EConstructStudioDockReason::Unavailable, FText::GetEmpty());
+	}
+}
+
+FString UConstructStudioDock::AgentToken() const
+{
+	if (TokenForTests.IsSet())
+	{
+		return TokenForTests.GetValue();
+	}
+	const UCrowdyStudioAgent* Agent = BoundAgent.Get();
+	return Agent ? Agent->GetAgentToken() : FString();
+}
+
+FString UConstructStudioDock::BridgeBoot(const UConstructStudioDockBridge& Caller)
+{
+	if (Bridge.Get() != &Caller || State == EConstructStudioDockState::Closed || !AgentBoot.IsValid() || !Channel.IsValid())
+	{
+		return ConstructStudioDockFrames::ErrorReply(TEXT("closed"));
+	}
+	if (!IsMainFrameOnOrigin())
+	{
+		return ConstructStudioDockFrames::ErrorReply(TEXT("off origin"));
+	}
+	// Each load of the page boots a fresh harness, so it gets a fresh nonce and channel.
+	const FString Nonce = ConstructStudioDockFrames::NewSecret();
+	const FString ChannelName = TEXT("crowdy-dsh-") + ConstructStudioDockFrames::NewSecret();
+	Channel->Begin(Generation, Nonce);
+	return ConstructStudioDockFrames::BootReply(*AgentBoot, CurrentProjectId, ConstructStudioDockFrames::PersistScope(AgentBoot->AppId, BootUser), ChannelName, Nonce);
+}
+
+FString UConstructStudioDock::BridgeSend(const UConstructStudioDockBridge& Caller, const FString& Frame)
+{
+	if (Bridge.Get() != &Caller || State == EConstructStudioDockState::Closed || !Channel.IsValid())
+	{
+		return ConstructStudioDockFrames::ErrorReply(TEXT("closed"));
+	}
+	if (!IsMainFrameOnOrigin())
+	{
+		return ConstructStudioDockFrames::ErrorReply(TEXT("off origin"));
+	}
+	ReceivePageFrame(Frame);
+	return ConstructStudioDockFrames::OkReply();
+}
+
+void UConstructStudioDock::ReceivePageFrame(const FString& Json)
+{
+	const TOptional<FConstructStudioDockFrame> Frame = Channel->Parse(Json);
+	if (!Frame.IsSet())
+	{
+		return;
+	}
+	const int64 FrameGeneration = Channel->GetGeneration();
+	switch (Frame->Kind)
+	{
+	case FConstructStudioDockFrame::EKind::Request:
+		ReceiveAgentRequest(FrameGeneration, Frame->Name, Frame->Id, Frame->Body);
+		return;
+	case FConstructStudioDockFrame::EKind::WorkerEvent:
+		ReceiveWorkerEvent(FrameGeneration, Frame->Name, Frame->Body);
+		return;
+	case FConstructStudioDockFrame::EKind::PageNotice:
+		ReceivePageNotice(FrameGeneration, Frame->Name, Frame->Body);
+		return;
+	}
+}
+
+void UConstructStudioDock::ReceivePageNotice(int64 InGeneration, const FString& Notice, const TSharedPtr<FJsonObject>& Payload)
+{
+	if (!IsCurrent(InGeneration))
+	{
+		return;
+	}
+	if (Notice.Equals(TEXT("joined"), ESearchCase::CaseSensitive))
+	{
+		Channel->SetPageJoined(InGeneration);
+		SendHello(InGeneration);
+		return;
+	}
+	if (Notice.Equals(TEXT("booted"), ESearchCase::CaseSensitive))
+	{
+		ReceiveBootOutcome(InGeneration, EConstructStudioDockState::Ready, EConstructStudioDockReason::None, FText::GetEmpty());
+		return;
+	}
+	if (!Notice.Equals(TEXT("failed"), ESearchCase::CaseSensitive))
+	{
+		return;
+	}
+	FString Message;
+	if (Payload.IsValid())
+	{
+		Payload->TryGetStringField(TEXT("message"), Message);
+	}
+	ReceiveBootOutcome(InGeneration, EConstructStudioDockState::Failed, EConstructStudioDockReason::HarnessFailed, FText::FromString(Message.Left(200)));
+}
+
+void UConstructStudioDock::ReceiveWorkerEvent(int64 InGeneration, const FString& Event, const TSharedPtr<FJsonObject>& Payload)
+{
+	if (!IsCurrent(InGeneration))
+	{
+		return;
+	}
+	// The worker re-sends ready until a page.hello reaches it.
+	if (Event.Equals(TEXT("worker.ready"), ESearchCase::CaseSensitive))
+	{
+		SendHello(InGeneration);
+		return;
+	}
+	FString Message;
+	if (Event.Equals(TEXT("worker.warning"), ESearchCase::CaseSensitive) && Payload.IsValid() && Payload->TryGetStringField(TEXT("message"), Message) && !Message.IsEmpty())
+	{
+		ReceiveWarning(InGeneration, FText::FromString(Message.Left(500)));
+	}
+}
+
+void UConstructStudioDock::ReceiveAgentRequest(int64 InGeneration, const FString& Method, const FString& Id, const TSharedPtr<FJsonObject>& Params)
+{
+	if (!IsCurrent(InGeneration))
+	{
+		return;
+	}
+	RefuseToAgent(InGeneration, Id, ConstructStudioDockFrames::IsAnsweredInUnreal(Method) ? EConstructStudioDockRefusal::NotOfferedYet : EConstructStudioDockRefusal::NotOffered);
+}
+
+bool UConstructStudioDock::ReplyToAgent(int64 InGeneration, const FString& Id, const TSharedRef<FJsonObject>& Result)
+{
+	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Reply(InGeneration, Id, Result);
+}
+
+bool UConstructStudioDock::RefuseToAgent(int64 InGeneration, const FString& Id, EConstructStudioDockRefusal Why)
+{
+	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Refuse(InGeneration, Id, Why);
+}
+
+bool UConstructStudioDock::TellAgent(int64 InGeneration, const FString& Event, const TSharedRef<FJsonObject>& Payload)
+{
+	return IsCurrent(InGeneration) && Channel.IsValid() && Channel->Tell(InGeneration, Event, Payload);
+}
+
+void UConstructStudioDock::SendHello(int64 InGeneration)
+{
+	bool bAccessEnded = false;
+	if (!IsCurrent(InGeneration) || !Channel.IsValid() || !AgentBoot.IsValid() || SignedInUser(bAccessEnded) != BootUser)
+	{
+		return;
+	}
+	Channel->Hello(InGeneration, LexToString(AgentBoot->AppId), CurrentProjectId, AgentToken());
+}
+
+void UConstructStudioDock::DeliverToPage(const FString& FrameJson)
+{
+	if (!IsMainFrameOnOrigin())
+	{
+		return;
+	}
+	const FString Script = TEXT("window.constructStudioDock&&window.constructStudioDock.deliver(") + FrameJson + TEXT(");");
+	if (ScriptsForTests)
+	{
+		ScriptsForTests(Script);
+		return;
+	}
+	if (Browser.IsValid())
+	{
+		Browser->ExecuteJavascript(Script);
+	}
+}
+
+bool UConstructStudioDock::IsMainFrameOnOrigin() const
+{
+	if (MainFrameUrlForTests.IsSet())
+	{
+		return ConstructStudioDockScheme::IsOnOrigin(MainFrameUrlForTests.GetValue());
+	}
+	return Browser.IsValid() && ConstructStudioDockScheme::IsOnOrigin(Browser->GetUrl());
+}
+
+void UConstructStudioDock::ShowBrowser()
+{
+	const TSharedPtr<SConstructStudioDockPlaceholder> Host = Placeholder.Pin();
+	if (!Host.IsValid() || !Bridge || !AgentBoot.IsValid())
+	{
+		return;
+	}
+	if (!Browser.IsValid())
+	{
+		Browser = SNew(SWebBrowser)
+			.InitialURL(ConstructStudioDockScheme::PageUrl)
+			.ShowControls(false)
+			.ShowAddressBar(false)
+			.ShowErrorMessage(false)
+			.ShowInitialThrobber(false)
+			.SupportsTransparency(false)
+			.BackgroundColor(FColor(16, 17, 17))
+			.OnLoadStarted(FSimpleDelegate::CreateUObject(this, &UConstructStudioDock::BindBridge))
+			.OnLoadCompleted(FSimpleDelegate::CreateUObject(this, &UConstructStudioDock::BindBridge))
+			.OnBeforeNavigation(SWebBrowser::FOnBeforeBrowse::CreateUObject(this, &UConstructStudioDock::BrowserNavigating))
+			.OnBeforePopup(FOnBeforePopupDelegate::CreateUObject(this, &UConstructStudioDock::BrowserPopup));
+	}
+	Host->ShowContent(Browser.ToSharedRef());
+}
+
+void UConstructStudioDock::BindBridge()
+{
+	// Not permanent: the browser drops the binding when the page goes, and it is bound again for each load.
+	if (!Browser.IsValid() || !Bridge || !IsMainFrameOnOrigin())
+	{
+		return;
+	}
+	Browser->BindUObject(ConstructStudioDockFrames::BridgeName, Bridge.Get(), false);
+}
+
+void UConstructStudioDock::ReleasePage()
+{
+	if (Channel.IsValid())
+	{
+		Channel->End();
+	}
+	if (Bridge)
+	{
+		Bridge->Dock.Reset();
+		if (Browser.IsValid())
+		{
+			Browser->UnbindUObject(ConstructStudioDockFrames::BridgeName, Bridge.Get(), false);
+		}
+	}
+	Bridge = nullptr;
+	if (const TSharedPtr<SConstructStudioDockPlaceholder> Host = Placeholder.Pin())
+	{
+		Host->ShowText();
+	}
+	Browser.Reset();
+	if (AgentBoot.IsValid())
+	{
+		ConstructStudioDockScheme::SetConnectOrigins(TArray<FString>());
+	}
+	AgentBoot.Reset();
+}
+
+bool UConstructStudioDock::BrowserNavigating(const FString& Url, const FWebNavigationRequest& Request)
+{
+	const ConstructStudioDockScheme::ENavigation Decision = ConstructStudioDockScheme::Navigation(Url, Request.bIsMainFrame, StudioOrigin);
+	if (Decision == ConstructStudioDockScheme::ENavigation::OpenOutside)
+	{
+		FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
+	}
+	return Decision != ConstructStudioDockScheme::ENavigation::Allow;
+}
+
+bool UConstructStudioDock::BrowserPopup(FString Url, FString Frame)
+{
+	if (ConstructStudioDockScheme::Popup(Url, StudioOrigin) == ConstructStudioDockScheme::ENavigation::OpenOutside)
+	{
+		FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
+	}
+	return true;
 }
 
 #undef LOCTEXT_NAMESPACE

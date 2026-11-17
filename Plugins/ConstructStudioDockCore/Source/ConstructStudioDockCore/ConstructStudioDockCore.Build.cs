@@ -17,10 +17,14 @@ public class ConstructStudioDockCore : ModuleRules
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "CrowdyNet",
+            "CrowdyReplication",
             "CrowdyServices",
             "InputCore",
             "JsonUtilities",
-            "Slate"
+            "Projects",
+            "Slate",
+            "WebBrowser"
         });
+        RuntimeDependencies.Add("$(PluginDir)/Resources/StudioDock/...", StagedFileType.NonUFS);
     }
 }
