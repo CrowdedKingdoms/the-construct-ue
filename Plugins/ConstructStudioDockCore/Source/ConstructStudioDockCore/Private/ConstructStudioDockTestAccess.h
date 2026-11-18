@@ -10,7 +10,7 @@
 #include "Subsystem/CrowdyStudioAgent.h"
 #include "UObject/StrongObjectPtr.h"
 
-/** Reaches the dock's inbound side and clock from tests, so they need neither a signed-in player nor the stand-in. */
+/** Reaches the dock's inbound side and clock from tests, so they need neither a signed-in player nor a live agent boot. */
 struct FConstructStudioDockTestAccess
 {
 	static void SignIn(UConstructStudioDock& Dock, int64 UserId)

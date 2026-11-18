@@ -1511,4 +1511,35 @@ bool FConstructStudioDockRequestsPathRuleTest::RunTest(const FString& Parameters
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructStudioDockRequestsWarningTextTest, "Construct.StudioDock.Requests.AgentWarningArrivesAsPlainTextOnOneLine", ConstructStudioDockRequestsTests::ReqFlags)
+bool FConstructStudioDockRequestsWarningTextTest::RunTest(const FString& Parameters)
+{
+	using namespace ConstructStudioDockRequestsTests;
+	FReqRig F;
+	F.Ready();
+	const auto Warn = [&F](const FString& Message)
+	{
+		const TSharedRef<FJsonObject> Payload = MakeShared<FJsonObject>();
+		Payload->SetStringField(TEXT("message"), Message);
+		F.Listener->Lines.Reset();
+		FReqAccess::WorkerEvent(*F.Dock, TEXT("worker.warning"), Payload);
+		return F.Listener->Lines.FilterByPredicate([](const FString& Line) { return Line.StartsWith(TEXT("Warning:"), ESearchCase::CaseSensitive); });
+	};
+
+	const FString Marked = ReqWith(TEXT("Disk"), 0x202E, TEXT(" full\r\nRun")) + ReqWith(TEXT(""), 0x2028, TEXT("now")) + ReqWith(TEXT(""), 0x07, TEXT(""))
+		+ ReqWith(TEXT(""), 0x200B, TEXT("!"));
+	const TArray<FString> Plain = Warn(Marked);
+	if (TestEqual(TEXT("a marked warning reaches the panel"), Plain.Num(), 1))
+	{
+		TestEqualSensitive(TEXT("with bidi and control characters gone and line breaks flattened"), Plain[0], FString(TEXT("Warning:Disk full  Run now!")));
+	}
+	TestEqual(TEXT("a warning of hidden characters only is dropped"), Warn(ReqWith(TEXT(""), 0x202E, TEXT("")) + ReqWith(TEXT(""), 0x07, TEXT(""))).Num(), 0);
+	const TArray<FString> Long = Warn(ReqWith(TEXT(""), 0x2066, *FString::ChrN(600, TEXT('w'))));
+	if (TestEqual(TEXT("a long warning arrives"), Long.Num(), 1))
+	{
+		TestEqual(TEXT("cut to 500 visible characters"), Long[0].Len(), FString(TEXT("Warning:")).Len() + 500);
+	}
+	return true;
+}
+
 #endif

@@ -63,7 +63,7 @@ bool FConstructStudioDockInertTest::RunTest(const FString& Parameters)
 		F.Open();
 		const int64 First = FAccess::Generation(*F.Dock);
 		FAccess::Advance(*F.Dock, 0.016f);
-		TestEqual(TEXT("with no stand-in the boot fails"), StateOf(F), FString(TEXT("Failed")));
+		TestEqual(TEXT("with no live boot and no claim the boot fails"), StateOf(F), FString(TEXT("Failed")));
 		TestEqual(TEXT("with NotBuiltYet"), ConstructStudioDockName(F.Dock->GetReason()), FString(TEXT("NotBuiltYet")));
 		TestFalse(TEXT("the reason has text the panel can show"), F.Dock->GetReasonText().IsEmpty());
 		FAccess::Advance(*F.Dock, 120.f);

@@ -1,6 +1,0 @@
-[
-  { "atMs": 1000, "event": "OnStateChanged", "args": { "State": "Ready" } },
-  { "atMs": 1000, "event": "studio.projectOpen", "args": { "ProjectId": "504", "ProjectName": "Stand-in Capture Demo", "Revision": "rev-1", "bReachesVisitors": false } },
-  { "atMs": 3000, "event": "studio.screenshot", "args": { "Label": "Stand-in: what the player sees" } },
-  { "atMs": 10000, "event": "studio.screenshot", "args": { "Label": "Stand-in: a second look" } }
-]

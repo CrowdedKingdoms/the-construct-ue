@@ -1,4 +1,5 @@
 #include "ConstructPresencePawn.h"
+#include "ConstructCapturePrivacy.h"
 
 #include "ConstructPresenceSubsystem.h"
 #include "ConstructPresenceOwnerRequest.h"
@@ -111,6 +112,7 @@ AConstructPresencePawn::AConstructPresencePawn()
 
 	NameTag = CreateDefaultSubobject<UTextRenderComponent>(TEXT("NameTag"));
 	NameTag->SetupAttachment(GetRootComponent());
+    NameTag->ComponentTags.AddUnique(ConstructCapturePrivacy::ExcludeTag);
 	NameTag->SetRelativeLocation(FVector(0.0f, 0.0f, HalfHeight + 30.0f));
 	NameTag->SetHorizontalAlignment(EHTA_Center);
 	NameTag->SetVerticalAlignment(EVRTA_TextCenter);
@@ -542,7 +544,7 @@ void AConstructPresencePawn::EnsurePlayerNameWidget()
 	if (PlayerNameWidget)
 	{
 		PlayerNameWidget->InitializeForPawn(this);
-		PlayerNameWidget->AddToViewport(6);
+		PlayerNameWidget->AddToPlayerScreen(6);
 		if (bLocalProfileReadComplete)
 		{
 			PlayerNameWidget->SetInitialProfile(LocalProfile, bLocalProfileReadSucceeded);
