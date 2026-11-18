@@ -24,6 +24,7 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/OutputDeviceRedirector.h"
+#include "Replication/Subsystems/CrowdyEntitySubsystem.h"
 #include "Templates/Atomic.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -121,6 +122,11 @@ struct FConstructPresenceTestAccess
 		Pawn.NameLookupEntity = NetID;
 		Pawn.NameLookupOwner = OwnerID;
 		Pawn.bNameLookupPending = true;
+	}
+
+	static void Rekey(AConstructPresencePawn& Pawn, const FGuid& PreviousID, const FGuid& NewID)
+	{
+		Pawn.HandleLocalRekey(PreviousID, NewID, TConstArrayView<FCrowdyRekeyedID>());
 	}
 
 	static void ConfigureLookMappings(UInputMappingContext* Context,
@@ -466,7 +472,7 @@ bool FConstructPresenceRejectedCallbacksTest::RunTest(const FString& Parameters)
 	          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
 	          OriginalName);
 	Fixture.Pawn->FindComponentByClass<UCrowdyEntityComponent>()->AssignPooledIdentity(
-	    FGuid::NewGuid(), FGuid::NewGuid(), ECrowdyRole::Owner, 0);
+	    FGuid::NewGuid(), FGuid::NewGuid(), 0, ECrowdyRole::Owner, 0);
 	FConstructPresenceTestAccess::ArmReplyWithoutSession(*Fixture.Pawn);
 	FConstructPresenceTestAccess::DeliverProfile(*Fixture.Pawn);
 	TestEqual(TEXT("Pending result without a valid local session cannot replace pawn name"),
@@ -598,7 +604,7 @@ bool FConstructPresenceIdentityGuardTest::RunTest(const FString& Parameters)
 		{
 			// These are isolated in-memory identities, with no token or sign-in.
 			Session->SetUserID(Case.User);
-			Entity->AssignPooledIdentity(Case.Net, Case.Owner, ECrowdyRole::Owner, 0);
+			Entity->AssignPooledIdentity(Case.Net, Case.Owner, Case.User, ECrowdyRole::Owner, 0);
 			TestTrue(TEXT("Every case passes the local-owner prerequisite"), Entity->IsLocallyOwned());
 			FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, TEXT("CurrentSyntheticName"));
 			FConstructPresenceTestAccess::ArmReply(*Fixture.Pawn, Session, 42, ExpectedNet, ExpectedOwner);
@@ -620,6 +626,97 @@ bool FConstructPresenceIdentityGuardTest::RunTest(const FString& Parameters)
 			TestFalse(TEXT("Every callback consumes its pending request"),
 			          FConstructPresenceTestAccess::HasPendingReply(*Fixture.Pawn));
 		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPresenceRekeyTest,
+                                 "Construct.Presence.Name.FollowsLocalRekey",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPresenceRekeyTest::RunTest(const FString& Parameters)
+{
+	ConstructPresenceTests::FBackgroundWorld Fixture;
+	if (!Fixture.Initialize(*this))
+	{
+		return false;
+	}
+	struct FSessionFixture
+	{
+		UWorld* World = nullptr;
+		TStrongObjectPtr<UGameInstance> Instance;
+		TStrongObjectPtr<UCrowdyGameSession> Session;
+		~FSessionFixture()
+		{
+			if (World)
+			{
+				World->SetGameInstance(nullptr);
+			}
+		}
+	} SessionFixture;
+	SessionFixture.World = Fixture.World;
+	SessionFixture.Instance.Reset(NewObject<UGameInstance>(GEngine));
+	SessionFixture.Session.Reset(NewObject<UCrowdyGameSession>(SessionFixture.Instance.Get()));
+	Fixture.World->SetGameInstance(SessionFixture.Instance.Get());
+	UCrowdyGameSession* Session = SessionFixture.Session.Get();
+	UCrowdyEntityComponent* Entity = Fixture.Pawn->FindComponentByClass<UCrowdyEntityComponent>();
+	if (!TestNotNull(TEXT("Re-key fixture owns a real SDK session object"), Session) ||
+	    !TestNotNull(TEXT("Re-key fixture has the production entity component"), Entity))
+	{
+		return false;
+	}
+	// These are isolated in-memory identities, with no token or sign-in.
+	Session->SetUserID(42);
+	struct FRekeyCase
+	{
+		const TCHAR* Label;
+		bool bAvatar;
+		bool bSameAsked;
+		bool bThisPawn;
+		bool bFailure;
+		bool bAccept;
+		bool bMoved;
+	};
+	const FRekeyCase Cases[] = {
+	    {TEXT("followed avatar re-key, success"), true, true, true, false, true, true},
+	    {TEXT("followed avatar re-key, failure"), true, true, true, true, true, true},
+	    {TEXT("followed writer re-point"), false, true, true, false, true, true},
+	    {TEXT("re-key of another player's id"), true, true, false, false, false, true},
+	    {TEXT("re-key from an id the read did not ask for"), true, false, true, false, false, true},
+	    {TEXT("re-key the pawn did not take"), true, true, true, false, true, false},
+	};
+	for (const FRekeyCase& Case : Cases)
+	{
+		const FGuid Asked = FGuid::NewGuid();
+		const FGuid Renewed = FGuid::NewGuid();
+		const FGuid Pooled = FGuid::NewGuid();
+		Entity->AssignPooledIdentity(Case.bAvatar ? Asked : Pooled, Asked, 42, ECrowdyRole::Owner, 0);
+		FConstructPresenceTestAccess::ApplyProfile(*Fixture.Pawn, TEXT("CurrentSyntheticName"));
+		FConstructPresenceTestAccess::ArmReply(*Fixture.Pawn, Session, 42, Case.bAvatar ? Asked : Pooled, Asked);
+		// The SDK moves the entity to the session's new id before it announces the re-key; an avatar's id moves too.
+		if (Case.bMoved)
+		{
+			Entity->AssignPooledIdentity(Case.bAvatar ? Renewed : Pooled, Renewed, 42, ECrowdyRole::Owner, 0);
+		}
+		FConstructPresenceTestAccess::Rekey(*Fixture.Pawn,
+		                                    Case.bSameAsked ? Asked : FGuid::NewGuid(),
+		                                    Case.bThisPawn ? Renewed : FGuid::NewGuid());
+		if (Case.bFailure)
+		{
+			FConstructPresenceTestAccess::DeliverFailure(*Fixture.Pawn);
+		}
+		else
+		{
+			FConstructPresenceTestAccess::DeliverProfile(*Fixture.Pawn);
+		}
+		const FString Expected = Case.bAccept ? (Case.bFailure ? TEXT("Player") : TEXT("LateSyntheticProfile"))
+		                                      : TEXT("CurrentSyntheticName");
+		TestEqual(*FString::Printf(TEXT("%s: the pending name read lands only under the pawn's current id"), Case.Label),
+		          FConstructPresenceTestAccess::Name(*Fixture.Pawn),
+		          Expected);
+		TestFalse(TEXT("Every reply consumes its pending request"),
+		          FConstructPresenceTestAccess::HasPendingReply(*Fixture.Pawn));
 	}
 	return true;
 }

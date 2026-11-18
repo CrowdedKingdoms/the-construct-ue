@@ -194,7 +194,7 @@ struct FFixture
 		Record.Participant = Pawn;
 		Entities->RegisterEntity(Record);
 		// Match the SDK pool: registration is announced before identity is assigned.
-		Pawn->FindComponentByClass<UCrowdyEntityComponent>()->AssignPooledIdentity(UUID, FGuid(), Role, 0);
+		Pawn->FindComponentByClass<UCrowdyEntityComponent>()->AssignPooledIdentity(UUID, FGuid(), 0, Role, 0);
 	}
 
 	AConstructPresencePawn* AddPawn(FAutomationTestBase& Test, const FGuid& UUID, ECrowdyRole Role)

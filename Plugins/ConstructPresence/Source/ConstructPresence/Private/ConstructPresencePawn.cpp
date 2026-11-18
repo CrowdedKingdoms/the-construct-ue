@@ -25,6 +25,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInterface.h"
+#include "Replication/Subsystems/CrowdyEntitySubsystem.h"
 #include "Subsystem/CrowdyGameSession.h"
 #include "Subsystem/CrowdyPlayers.h"
 #include "UObject/ConstructorHelpers.h"
@@ -129,6 +130,11 @@ void AConstructPresencePawn::BeginPlay()
 	Super::BeginPlay();
     bOwnerIdentityEnded = false;
 	Entity->OnCrowdyOwnershipAssigned.AddUniqueDynamic(this, &ThisClass::HandleOwnershipAssigned);
+	if (UCrowdyEntitySubsystem* Entities = GetWorld()->GetSubsystem<UCrowdyEntitySubsystem>())
+	{
+		RekeySource = Entities;
+		RekeyHandle = Entities->OnLocalPlayerRekeyed.AddUObject(this, &ThisClass::HandleLocalRekey);
+	}
 	RefreshMovementState();
 }
 
@@ -142,6 +148,12 @@ void AConstructPresencePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	bNameLookupPending = false;
 	NameLookupSession.Reset();
 	Entity->OnCrowdyOwnershipAssigned.RemoveDynamic(this, &ThisClass::HandleOwnershipAssigned);
+	if (UCrowdyEntitySubsystem* Entities = RekeySource.Get())
+	{
+		Entities->OnLocalPlayerRekeyed.Remove(RekeyHandle);
+	}
+	RekeySource.Reset();
+	RekeyHandle.Reset();
 	NameCamera.Reset();
 	Super::EndPlay(EndPlayReason);
 }
@@ -464,6 +476,32 @@ void AConstructPresencePawn::HandleOwnershipAssigned(const FGuid& NewOwnerID, EC
 	Players->GetPlayerName(NameLookupUser, Result, Error);
 }
 
+void AConstructPresencePawn::HandleLocalRekey(const FGuid& PreviousID, const FGuid& NewID, TConstArrayView<FCrowdyRekeyedID> Participants)
+{
+	if (!Entity || !PreviousID.IsValid() || Entity->GetWriterID() != NewID || !Entity->IsLocallyOwned())
+	{
+		return;
+	}
+	ResetConfirmedOwner();
+	if (PlayerNameWidget)
+	{
+		PlayerNameWidget->FollowRekey(PreviousID, NewID);
+	}
+	// The same pawn under the player's new actor id: a name read already asked for still belongs to it.
+	if (!bNameLookupPending)
+	{
+		return;
+	}
+	if (NameLookupEntity == PreviousID)
+	{
+		NameLookupEntity = NewID;
+	}
+	if (NameLookupOwner == PreviousID)
+	{
+		NameLookupOwner = NewID;
+	}
+}
+
 float AConstructPresencePawn::ControllerPitchDelta(float AxisY, float Scale)
 {
 	return -AxisY * Scale;
@@ -475,7 +513,7 @@ bool AConstructPresencePawn::ConsumeNameReply()
 	const bool bAccept = bNameLookupPending && !IsActorBeingDestroyed() && Entity && Entity->IsLocallyOwned() &&
 	                     Session && Session->GetGameInstance() == GetGameInstance() &&
 	                     Session->GetUserID() == NameLookupUser && Entity->GetNetID() == NameLookupEntity &&
-	                     Entity->GetOwnerID() == NameLookupOwner;
+	                     Entity->GetWriterID() == NameLookupOwner;
 	bNameLookupPending = false;
 	NameLookupSession.Reset();
 	return bAccept;

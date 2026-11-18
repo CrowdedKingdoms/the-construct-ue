@@ -11,6 +11,8 @@ class APlayerCameraManager;
 class UConstructPlayerNameWidget;
 class UCrowdyGameSession;
 class UConstructPresenceOwnerRequest;
+class UCrowdyEntitySubsystem;
+struct FCrowdyRekeyedID;
 struct FConstructPlayerNameTestAccess;
 class UCameraComponent;
 class UConstructUIInputSubsystem;
@@ -76,6 +78,7 @@ private:
 
 	UFUNCTION()
 	void HandleOwnershipAssigned(const FGuid& NewOwnerID, ECrowdyRole NewRole, bool bIsLocallyOwned);
+	void HandleLocalRekey(const FGuid& PreviousID, const FGuid& NewID, TConstArrayView<FCrowdyRekeyedID> Participants);
 	UFUNCTION()
 	void HandleNameRead(FCrowdyPlayerProfile Profile);
 	UFUNCTION()
@@ -116,6 +119,8 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UConstructPresenceOwnerRequest> OwnerRequest;
     FTimerHandle OwnerRetryTimer;
+    TWeakObjectPtr<UCrowdyEntitySubsystem> RekeySource;
+    FDelegateHandle RekeyHandle;
     uint64 OwnerLookupGeneration = 0;
     int64 ConfirmedOwnerUserId = 0;
     bool bOwnerIdentityEnded = false;
