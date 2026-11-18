@@ -214,7 +214,7 @@ EConstructStudioDockReason UConstructStudioDock::Open(int64 GridId, const FText&
 	WorldCleanupHandle = FWorldDelegates::OnWorldCleanup.AddUObject(this, &UConstructStudioDock::WorldCleanup);
 	SetState(EConstructStudioDockState::Booting, EConstructStudioDockReason::None);
 	Send(TEXT("Open"), LexToString(GridId));
-	// A stand-in that claimed the boot while hearing Open replays it instead.
+	// Only tests claim the boot; one claimed while Open was heard skips the live boot.
 	if (!bBootReplayed && State == EConstructStudioDockState::Booting)
 	{
 		StartLiveBoot();
@@ -1515,9 +1515,21 @@ void UConstructStudioDock::ReceiveWorkerEvent(int64 InGeneration, const FString&
 		return;
 	}
 	FString Message;
-	if (Event.Equals(TEXT("worker.warning"), ESearchCase::CaseSensitive) && Payload.IsValid() && Payload->TryGetStringField(TEXT("message"), Message) && !Message.IsEmpty())
+	if (!Event.Equals(TEXT("worker.warning"), ESearchCase::CaseSensitive) || !Payload.IsValid() || !Payload->TryGetStringField(TEXT("message"), Message))
 	{
-		ReceiveWarning(InGeneration, FText::FromString(Message.Left(500)));
+		return;
+	}
+	for (TCHAR& Character : Message)
+	{
+		if (FChar::IsLinebreak(Character))
+		{
+			Character = TEXT(' ');
+		}
+	}
+	const FString Warning = ConstructStudioDockReplies::PlainText(Message).Left(500);
+	if (!Warning.IsEmpty())
+	{
+		ReceiveWarning(InGeneration, FText::FromString(Warning));
 	}
 }
 

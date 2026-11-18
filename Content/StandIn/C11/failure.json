@@ -1,3 +1,0 @@
-[
-  { "atMs": 3000, "event": "OnStateChanged", "args": { "State": "Failed", "Reason": "NoModel" } }
-]

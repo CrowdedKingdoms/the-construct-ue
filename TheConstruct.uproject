@@ -11,6 +11,7 @@
 		}
 	],
 	"Plugins": [
+        { "Name": "ConstructStudioDock", "Enabled": true },
 		{
 			"Name": "Diversion",
 			"Enabled": true,

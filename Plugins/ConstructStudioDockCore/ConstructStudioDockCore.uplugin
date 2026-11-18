@@ -3,7 +3,7 @@
   "Version": 1,
   "VersionName": "0.1.0",
   "FriendlyName": "Construct Studio Dock Core",
-  "Description": "The Studio dock widget, its host interface and types, and the stand-in that replays recorded dock timelines.",
+  "Description": "The live Studio dock browser, host interface and typed events.",
   "Category": "Construct",
   "CanContainContent": false,
   "EnabledByDefault": true,

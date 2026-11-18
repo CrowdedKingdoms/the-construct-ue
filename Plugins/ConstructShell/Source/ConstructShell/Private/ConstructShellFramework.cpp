@@ -110,7 +110,7 @@ void AConstructShellHUD::BeginPlay()
 	}
 	SignIn->SetIsFocusable(true);
 	SignIn->AddToViewport(10);
-	ConnectionStatus->AddToViewport(5);
+	ConnectionStatus->AddToPlayerScreen(5);
 	if (UGameInstance* Instance = GetGameInstance())
 	{
 		if (UCrowdySDKSubsystem* SDK = Instance->GetSubsystem<UCrowdySDKSubsystem>())

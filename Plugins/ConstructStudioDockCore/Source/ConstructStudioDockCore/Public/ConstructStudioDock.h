@@ -166,14 +166,13 @@ private:
 	friend class UConstructStudioDockBridge;
 	friend class UConstructStudioScriptWatch;
 	friend struct FConstructStudioDockTestAccess;
-	// The stand-in replays recorded agent traffic through Outbound and the Receive functions; nothing else reaches them.
-	friend class UStandInC11;
 
 	/** What the dock tells the agent's page and the platform: a message name and a short detail. */
 	static TMulticastDelegate<void(UConstructStudioDock&, FName, const FString&)> Outbound;
 	static TWeakObjectPtr<UConstructStudioDock> OpenDock;
 	static int64 LastPromptId;
 
+	/** Used only by tests: a claimed boot is not failed for lacking a live boot. */
 	void ClaimBoot();
 	void ReceiveBootOutcome(int64 InGeneration, EConstructStudioDockState NewState, EConstructStudioDockReason NewReason, const FText& Text);
 	void ReceiveProject(int64 InGeneration, const FString& InProjectId, const FString& Name, const FString& InRevision, bool bInReachesVisitors);

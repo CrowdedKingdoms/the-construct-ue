@@ -1,0 +1,46 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Studio Dock",
+  "Description": "Studio panel, native prompts, gameplay layout and private scene capture.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "SupportedTargetPlatforms": [
+    "Win64"
+  ],
+  "Modules": [
+    {
+      "Name": "ConstructStudioDock",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "ConstructShell",
+      "Enabled": true
+    },
+    {
+      "Name": "ConstructStudioDockCore",
+      "Enabled": true
+    },
+    {
+      "Name": "ConstructWorld",
+      "Enabled": true
+    },
+    {
+      "Name": "CrowdySDK",
+      "Enabled": true
+    },
+    {
+      "Name": "WebBrowserWidget",
+      "Enabled": true
+    }
+  ]
+}
+
