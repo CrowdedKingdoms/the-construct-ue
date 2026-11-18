@@ -130,7 +130,7 @@ struct FFixture
 		Controller->Possess(Pawn);
 		if (UCrowdyEntityComponent* Entity = Pawn->FindComponentByClass<UCrowdyEntityComponent>())
 		{
-			Entity->AssignPooledIdentity(FGuid::NewGuid(), FGuid::NewGuid(), ECrowdyRole::Owner, 0);
+			Entity->AssignPooledIdentity(FGuid::NewGuid(), FGuid::NewGuid(), 0, ECrowdyRole::Owner, 0);
 		}
 		FConstructInputTestAccess::Install(*Pawn);
 		UConstructUIInputSubsystem* Gate = Local->GetSubsystem<UConstructUIInputSubsystem>();

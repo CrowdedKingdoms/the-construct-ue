@@ -294,7 +294,7 @@ bool UConstructPlayerNameWidget::ResolveIdentity(int64& UserID, FGuid& NetID, FG
 	}
 	UserID = PlayerSession->GetUserID();
 	NetID = PlayerEntity->GetNetID();
-	OwnerID = PlayerEntity->GetOwnerID();
+	OwnerID = PlayerEntity->GetWriterID();
 	return NetID.IsValid();
 }
 
@@ -338,6 +338,23 @@ void UConstructPlayerNameWidget::SetInitialProfile(const FCrowdyPlayerProfile& P
 	{
 		bInitialPromptPending = true;
 		TryInitialPrompt();
+	}
+}
+
+void UConstructPlayerNameWidget::FollowRekey(const FGuid& PreviousID, const FGuid& NewID)
+{
+	UConstructPlayerNameRequest* Request = ActiveRequest.Get();
+	if (!Request || !PreviousID.IsValid())
+	{
+		return;
+	}
+	if (Request->ExpectedNetID == PreviousID)
+	{
+		Request->ExpectedNetID = NewID;
+	}
+	if (Request->ExpectedOwnerID == PreviousID)
+	{
+		Request->ExpectedOwnerID = NewID;
 	}
 }
 

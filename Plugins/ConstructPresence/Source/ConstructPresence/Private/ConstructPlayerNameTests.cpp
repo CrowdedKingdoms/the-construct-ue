@@ -111,6 +111,22 @@ struct FConstructPlayerNameTestAccess
 		return Widget.ActiveRequest.Get();
 	}
 
+	static void SetExpectedIdentity(UConstructPlayerNameRequest& Request, const FGuid& NetID, const FGuid& WriterID)
+	{
+		Request.ExpectedNetID = NetID;
+		Request.ExpectedOwnerID = WriterID;
+	}
+
+	static FGuid ExpectedNetID(const UConstructPlayerNameRequest& Request)
+	{
+		return Request.ExpectedNetID;
+	}
+
+	static FGuid ExpectedWriterID(const UConstructPlayerNameRequest& Request)
+	{
+		return Request.ExpectedOwnerID;
+	}
+
 	static void Succeed(UConstructPlayerNameRequest& Request, const FCrowdyPlayerProfile& Profile)
 	{
 		Request.Succeeded(Profile);
@@ -376,6 +392,61 @@ bool FConstructPlayerNameStaleReceiverTest::RunTest(const FString& Parameters)
 	          Fixture.Widget->GetGamertag(),
 	          FString(TEXT("CurrentSyntheticDraft")));
 	// Removing ActiveRequest != Request is observable even with no session: ConsumeRequest would clear Current.
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FConstructPlayerNameRekeyTest,
+                                 "Construct.Presence.PlayerName.RequestFollowsRekey",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FConstructPlayerNameRekeyTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UConstructPlayerNameWidget> Widget(NewObject<UConstructPlayerNameWidget>());
+	const FGuid Previous = FGuid::NewGuid();
+	const FGuid Next = FGuid::NewGuid();
+	Widget->FollowRekey(Previous, Next);
+	TestNull(TEXT("A re-key with no request in flight starts none"), FConstructPlayerNameTestAccess::Active(*Widget));
+
+	TStrongObjectPtr<UConstructPlayerNameRequest> Request(FConstructPlayerNameTestAccess::MakeRequest(*Widget));
+	FConstructPlayerNameTestAccess::SetExpectedIdentity(*Request, Previous, Previous);
+	FConstructPlayerNameTestAccess::SetActive(*Widget, Request.Get());
+	Widget->FollowRekey(FGuid::NewGuid(), FGuid::NewGuid());
+	TestEqual(TEXT("A re-key of another id leaves the request's entity"),
+	          FConstructPlayerNameTestAccess::ExpectedNetID(*Request),
+	          Previous);
+	TestEqual(TEXT("A re-key of another id leaves the request's writer"),
+	          FConstructPlayerNameTestAccess::ExpectedWriterID(*Request),
+	          Previous);
+
+	Widget->FollowRekey(Previous, Next);
+	TestEqual(TEXT("The request follows its pawn's new actor id"),
+	          FConstructPlayerNameTestAccess::ExpectedNetID(*Request),
+	          Next);
+	TestEqual(TEXT("The request follows its pawn's new writer id"),
+	          FConstructPlayerNameTestAccess::ExpectedWriterID(*Request),
+	          Next);
+	TestTrue(TEXT("Following a re-key keeps the same request in flight"),
+	         FConstructPlayerNameTestAccess::Active(*Widget) == Request.Get());
+
+	const FGuid OtherWriter = FGuid::NewGuid();
+	FConstructPlayerNameTestAccess::SetExpectedIdentity(*Request, Next, OtherWriter);
+	const FGuid Third = FGuid::NewGuid();
+	Widget->FollowRekey(Next, Third);
+	TestEqual(TEXT("A writer that was not the old id is kept"),
+	          FConstructPlayerNameTestAccess::ExpectedWriterID(*Request),
+	          OtherWriter);
+
+	const FGuid EntityID = FGuid::NewGuid();
+	FConstructPlayerNameTestAccess::SetExpectedIdentity(*Request, EntityID, Previous);
+	Widget->FollowRekey(Previous, Next);
+	TestEqual(TEXT("A re-pointed writer keeps the request's entity"),
+	          FConstructPlayerNameTestAccess::ExpectedNetID(*Request),
+	          EntityID);
+	TestEqual(TEXT("A re-pointed writer moves the request's writer"),
+	          FConstructPlayerNameTestAccess::ExpectedWriterID(*Request),
+	          Next);
+	// The user check stays in ConsumeRequest, so a re-key to another user still drops the reply.
 	return true;
 }
 

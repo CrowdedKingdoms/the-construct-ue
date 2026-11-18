@@ -14,7 +14,7 @@ void UConstructPresenceOwnerRequest::Initialize(AConstructPresencePawn* InPawn, 
     Instance = InPawn->GetGameInstance();
     World = InPawn->GetWorld();
     EntityId = InPawn->Entity->GetNetID();
-    OwnerId = InPawn->Entity->GetOwnerID();
+    OwnerId = InPawn->Entity->GetWriterID();
     SessionUserId = InSession->GetUserID();
     SessionGameTokenId = InSession->GetSessionGameTokenID();
     Generation = InGeneration;
@@ -27,7 +27,7 @@ bool UConstructPresenceOwnerRequest::MatchesCurrent(const AConstructPresencePawn
     return IsValid(InPawn) && Pawn.Get() == InPawn && !InPawn->bOwnerIdentityEnded &&
         !InPawn->IsActorBeingDestroyed() && !InPawn->IsHidden() && IsValid(InPawn->Entity) &&
         InPawn->Entity->GetNetID().IsValid() && InPawn->Entity->GetNetID() == EntityId &&
-        InPawn->Entity->GetOwnerID() == OwnerId && InPawn->OwnerLookupGeneration == Generation &&
+        InPawn->Entity->GetWriterID() == OwnerId && InPawn->OwnerLookupGeneration == Generation &&
         World.IsValid() && World.Get() == InPawn->GetWorld() && CurrentInstance &&
         CurrentInstance == InPawn->GetGameInstance() && CurrentSession &&
         CurrentSession->GetGameInstance() == CurrentInstance &&

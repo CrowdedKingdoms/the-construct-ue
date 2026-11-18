@@ -45,6 +45,8 @@ class CONSTRUCTPRESENCE_API UConstructPlayerNameWidget : public UUserWidget
 public:
 	void InitializeForPawn(AConstructPresencePawn* Pawn);
 	void SetInitialProfile(const FCrowdyPlayerProfile& Profile, bool bReadSucceeded);
+	/** Keeps a request in flight for the same pawn and user when the pawn's actor id changes. */
+	void FollowRekey(const FGuid& PreviousID, const FGuid& NewID);
 	void Shutdown();
 
 	UFUNCTION(BlueprintCallable, Category = "Construct|Player Name")
