@@ -1,5 +1,5 @@
 [submodule "Plugins/CrowdySDK"]
 	path = Plugins/CrowdySDK
 	url = https://github.com/CrowdedKingdoms/CrowdySDK-Unreal.git
-	branch = test
+	branch = prod
 	ignore = untracked
