@@ -28,8 +28,9 @@ Clone it, run it against your own app, then replace the demo scenes with your ga
 
 ## Getting it running
 
-Prerequisites: Unreal Engine 5.8, Visual Studio with the Unreal workload, git, and a Crowded Kingdoms account (sign up
-at [studio.crowdedkingdoms.com](https://studio.crowdedkingdoms.com)).
+Prerequisites: Unreal Engine 5.8, Visual Studio with the Unreal workload, git 2.45.2 or later with Git LFS (2.45.1
+refuses Git LFS's hooks while cloning, and the SDK keeps a large library in LFS), and a Crowded Kingdoms account (sign
+up at [studio.crowdedkingdoms.com](https://studio.crowdedkingdoms.com)).
 
 1. **Clone with the SDK**, into a short path (Unreal fails on very long ones):
 
