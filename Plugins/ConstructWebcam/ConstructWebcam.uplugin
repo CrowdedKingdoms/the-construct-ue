@@ -1,0 +1,17 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Webcam",
+  "Description": "Opt-in webcam video over presence pawns: capture, encoding, sending and decoding.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [{"Name":"ConstructWebcam","Type":"Runtime","LoadingPhase":"Default"}],
+  "Plugins": [
+    {"Name":"ConstructShell","Enabled":true},
+    {"Name":"ConstructPresence","Enabled":true},
+    {"Name":"CrowdySDK","Enabled":true},
+    {"Name":"WmfMedia","Enabled":true,"PlatformAllowList":["Win64"]}
+  ]
+}

@@ -1,0 +1,14 @@
+[package]
+name = "construct_progress"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata.crowdy]
+definition = "/Game/ServerObjects/CSO_ConstructProgress.CSO_ConstructProgress"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ckx-sdk = "0.12.1"
+serde = { version = "1", features = ["derive"] }

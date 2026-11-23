@@ -1,0 +1,12 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Voice",
+  "Description": "Opt-in push-to-talk and listening controls over the existing Crowdy voice service.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [{"Name":"ConstructVoice","Type":"Runtime","LoadingPhase":"Default"}],
+  "Plugins": [{"Name":"ConstructShell","Enabled":true},{"Name":"CrowdySDK","Enabled":true},{"Name":"EnhancedInput","Enabled":true}]
+}

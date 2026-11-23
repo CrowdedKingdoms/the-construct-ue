@@ -1,0 +1,17 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Construct Panels",
+  "Description": "Player-facing webcam controls and feeds using the Construct's shared visual style.",
+  "Category": "Construct",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [{ "Name": "ConstructPanels", "Type": "Runtime", "LoadingPhase": "Default" }],
+  "Plugins": [
+    { "Name": "ConstructPresence", "Enabled": true },
+    { "Name": "ConstructShell", "Enabled": true },
+    { "Name": "ConstructWebcam", "Enabled": true },
+    { "Name": "CrowdySDK", "Enabled": true }
+  ]
+}
