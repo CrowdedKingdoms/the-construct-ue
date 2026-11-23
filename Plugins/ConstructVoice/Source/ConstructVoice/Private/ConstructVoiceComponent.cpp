@@ -451,8 +451,6 @@ void UConstructVoiceComponent::ReconcileCapture(bool bUserEdge)
 	}
 	bCaptureRequested = true;
 	bVoiceServiceActivated = true;
-	// Apply the starter's nearby range only when this player actually requests capture.
-	SDK->SetVoiceChatDistance(1);
 	SDK->StartVoiceChat();
 	LastStatus = LOCTEXT("Starting",
 	                     "Microphone capture requested. Capture status below reflects the SDK's actual device state.");
